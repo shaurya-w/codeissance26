@@ -1,0 +1,49 @@
+/**
+ * globals.css
+ * -----------
+ * Single source of truth for the app's design tokens: colors, typography,
+ * spacing, and radii.
+ *
+ * React Native does NOT load CSS files or parse CSS variables at runtime,
+ * so this file does not style anything by itself. It exists so that:
+ *
+ *   1. All design decisions live in ONE place, in a format that's easy to
+ *      scan and easy to hand to a designer.
+ *   2. `constants/theme.ts` mirrors these exact values as a plain JS object
+ *      that React Native components import and use.
+ *
+ * When you change a value here, update the matching value in
+ * `constants/theme.ts` so the two stay in sync.
+ */
+
+:root {
+  /* Colors */
+  --color-background: #0b41ac;
+  --color-surface: #FFFFFF;
+  --color-primary: #46e566;
+  --color-secondary: #14B8A6;
+  --color-text: #111827;
+  --color-text-muted: #6B7280;
+  --color-border: #E5E7EB;
+  --color-success: #16A34A;
+  --color-danger: #DC2626;
+
+  /* Typography */
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 20px;
+  --font-size-xl: 28px;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+}
