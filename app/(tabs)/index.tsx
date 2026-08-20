@@ -3,9 +3,27 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { Header } from "@/components/Header";
 import { theme } from "@/constants/theme";
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { useOnboarding } from "@/context/OnboardingContext";
+
+function formatCurrency(amount: number): string {
+  return `₹${amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+}
+
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+    });
+  } catch {
+    return iso;
+  }
+}
 
 export default function HomeScreen() {
+  const { state } = useOnboarding();
+  const { bankFeedResult, gigPayoutResults } = state;
+
   return (
     <View style={styles.container}>
       <Header
@@ -18,163 +36,89 @@ export default function HomeScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Main Display Headline */}
-        <View style={styles.heroSection}>
-          <Text style={styles.heroEyebrow}>SYSTEM OVERVIEW</Text>
-          <Text style={styles.heroHeadline}>Water</Text>
-          <Text style={styles.heroHeadlineAccent}>Footprint</Text>
-          <Text style={styles.heroSub}>
-            Real-time agricultural telemetry & origin impact estimation.
-          </Text>
-        </View>
+        
+        {gigPayoutResults && gigPayoutResults.length > 0 ? (
+          <View style={styles.dataCard}>
+            <View style={styles.dataCardHeader}>
+              <Text style={styles.microLabel}>GIG PAYOUTS</Text>
+              <Text style={styles.microLabel}>{gigPayoutResults.length} LINKED</Text>
+            </View>
 
-        {/* Data Card Motif: Large font-mono metric card */}
-        <View style={styles.dataCard}>
-          <View style={styles.dataCardHeader}>
-            <Text style={styles.microLabel}>ESTIMATED INTENSITY</Text>
-            <View
-              style={[
-                styles.badge,
-                { backgroundColor: theme.colors.waterIntensity.low.background },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.badgeText,
-                  { color: theme.colors.waterIntensity.low.text },
-                ]}
-              >
-                LOW INTENSITY
-              </Text>
-            </View>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.monoMetric}>1,420</Text>
-            <Text style={styles.monoUnit}>L / kg</Text>
-          </View>
-          <Text style={styles.contextText}>
-            Current origin estimate is 14% below regional benchmark.
-          </Text>
-          <View style={styles.dashedDivider} />
-          <View style={styles.benchmarkRow}>
-            <View style={styles.benchmarkItem}>
-              <Text style={styles.microLabel}>INDIA AVERAGE</Text>
-              <Text style={[styles.benchmarkValue, { color: theme.colors.indiaAverage }]}>
-                1,650 L/kg
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.avgBadge,
-                { backgroundColor: theme.colors.belowAverage.background },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.avgBadgeText,
-                  { color: theme.colors.belowAverage.text },
-                ]}
-              >
-                BELOW AVG
-              </Text>
-            </View>
-          </View>
-        </View>
+            {gigPayoutResults.map((result, index) => (
+              <View key={result.data.id}>
+                <View style={styles.metricRow}>
+                  <Text style={styles.monoMetric}>{formatCurrency(result.data.expected_net)}</Text>
+                  <Text style={styles.monoUnit}>net</Text>
+                </View>
+                <Text style={styles.contextText}>{result.message}</Text>
 
-        {/* Supabase Status Card */}
-        <View style={styles.statusCard}>
-          <View style={styles.statusCardHeader}>
-            <Text style={styles.microLabel}>SUPABASE DATABASE</Text>
-            <View
-              style={[
-                styles.statusDot,
-                {
-                  backgroundColor: isSupabaseConfigured
-                    ? theme.colors.waterIntensity.low.text
-                    : theme.colors.waterIntensity.high.text,
-                },
-              ]}
-            />
-          </View>
-          <Text style={styles.statusValue}>
-            {isSupabaseConfigured ? "Connected & Active" : "Configuration Required"}
-          </Text>
-          <Text style={styles.statusHint}>
-            {isSupabaseConfigured
-              ? "Real-time edge telemetry synchronized."
-              : "Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to .env"}
-          </Text>
-        </View>
+                <View style={styles.dashedDivider} />
 
-        {/* Water Intensity Badge Tokens Preview */}
-        <View style={styles.badgesSection}>
-          <Text style={styles.sectionTitle}>Intensity Scale</Text>
-          <View style={styles.badgesRow}>
-            <View
-              style={[
-                styles.badge,
-                { backgroundColor: theme.colors.waterIntensity.low.background },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.badgeText,
-                  { color: theme.colors.waterIntensity.low.text },
-                ]}
-              >
-                LOW
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.badge,
-                { backgroundColor: theme.colors.waterIntensity.medium.background },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.badgeText,
-                  { color: theme.colors.waterIntensity.medium.text },
-                ]}
-              >
-                MEDIUM
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.badge,
-                { backgroundColor: theme.colors.waterIntensity.high.background },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.badgeText,
-                  { color: theme.colors.waterIntensity.high.text },
-                ]}
-              >
-                HIGH
-              </Text>
-            </View>
-          </View>
-        </View>
+                <View style={styles.benchmarkRow}>
+                  <View style={styles.benchmarkItem}>
+                    <Text style={styles.microLabel}>GROSS</Text>
+                    <Text style={[styles.benchmarkValue, { color: theme.colors.ink }]}>
+                      {formatCurrency(result.data.expected_gross)}
+                    </Text>
+                  </View>
+                  <View style={styles.benchmarkItem}>
+                    <Text style={styles.microLabel}>PLATFORM FEE</Text>
+                    <Text style={[styles.benchmarkValue, { color: theme.colors.danger }]}>
+                      -{formatCurrency(result.data.platform_fee)}
+                    </Text>
+                  </View>
+                  <View style={styles.benchmarkItem}>
+                    <Text style={styles.microLabel}>TDS</Text>
+                    <Text style={[styles.benchmarkValue, { color: theme.colors.warning }]}>
+                      -{formatCurrency(result.data.tds_deducted)}
+                    </Text>
+                  </View>
+                </View>
 
-        {/* Food Swatches Preview */}
-        <View style={styles.swatchesSection}>
-          <Text style={styles.sectionTitle}>Food Palette Swatches</Text>
-          <View style={styles.swatchesGrid}>
-            {theme.colors.foodSwatches.map((color, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.swatchItem,
-                  { backgroundColor: color },
-                ]}
-              >
-                <Text style={styles.swatchIndex}>{index + 1}</Text>
+                {index < gigPayoutResults.length - 1 && <View style={styles.dashedDivider} />}
               </View>
             ))}
           </View>
-        </View>
+        ) : null}
+
+        {bankFeedResult && bankFeedResult.data.length > 0 ? (
+          <View style={styles.dataCard}>
+            <View style={styles.dataCardHeader}>
+              <Text style={styles.microLabel}>RECENT BANK ACTIVITY</Text>
+              <Text style={styles.microLabel}>{bankFeedResult.total_processed} SYNCED</Text>
+            </View>
+
+            {bankFeedResult.data.map((txn, index) => {
+              const isIncome = txn.type === "INCOME";
+              const badgeColors = isIncome
+                ? theme.colors.belowAverage
+                : theme.colors.aboveAverage;
+
+              return (
+                <View key={txn.id}>
+                  <View style={styles.benchmarkRow}>
+                    <View style={styles.benchmarkItem}>
+                      <Text style={styles.contextText}>{formatDate(txn.date)}</Text>
+                      <Text style={styles.microLabel}>{txn.category.replace(/_/g, " ")}</Text>
+                    </View>
+                    <View style={[styles.avgBadge, { backgroundColor: badgeColors.background }]}>
+                      <Text
+                        style={[
+                          styles.avgBadgeText,
+                          { color: badgeColors.text },
+                        ]}
+                      >
+                        {isIncome ? "+" : "-"}
+                        {formatCurrency(txn.amount)}
+                      </Text>
+                    </View>
+                  </View>
+                  {index < bankFeedResult.data.length - 1 && <View style={styles.dashedDivider} />}
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -297,79 +241,4 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: "uppercase",
   },
-  statusCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.card,
-    padding: theme.spacing.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    ...theme.shadows.soft,
-    gap: theme.spacing.xs,
-  },
-  statusCardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: theme.radius.full,
-  },
-  statusValue: {
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.typography.fontWeights.bold,
-    color: theme.colors.ink,
-  },
-  statusHint: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.mutedSage.muted1,
-  },
-  badgesSection: {
-    gap: theme.spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.typography.fontWeights.black,
-    color: theme.colors.ink,
-  },
-  badgesRow: {
-    flexDirection: "row",
-    gap: theme.spacing.sm,
-  },
-  badge: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.radius.full,
-  },
-  badgeText: {
-    fontSize: theme.typography.eyebrow.fontSize,
-    fontWeight: theme.typography.eyebrow.fontWeight,
-    letterSpacing: 1.5,
-    textTransform: "uppercase",
-  },
-  swatchesSection: {
-    gap: theme.spacing.sm,
-  },
-  swatchesGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.xs,
-  },
-  swatchItem: {
-    width: 38,
-    height: 38,
-    borderRadius: theme.radius.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  swatchIndex: {
-    fontFamily: theme.typography.fontMono,
-    fontSize: theme.fontSize.micro,
-    fontWeight: theme.typography.fontWeights.bold,
-    color: theme.colors.ink,
-  },
 });
-

@@ -7,6 +7,11 @@ import { Platform } from "react-native";
  *
  * RULE: NEVER hardcode colors inside individual components.
  * All colors, typography styles, shadows, and radii MUST be imported from here.
+ *
+ * CHANGE LOG (this pass):
+ * - Added `colors.onboarding` semantic tokens for selection cards, progress
+ *   indicators, and inline feedback (error/success) used by the onboarding flow.
+ *   Nothing existing was renamed or removed.
  */
 
 export const theme = {
@@ -107,6 +112,38 @@ export const theme = {
     success: "#3f7650",
     danger: "#985743",
     warning: "#92703b",
+
+    // Onboarding — selection cards, progress, inline feedback
+    onboarding: {
+      selection: {
+        background: "#ffffff",
+        backgroundActive: "#edf2e8", // surfaceSubtle
+        border: "#d9e3d7", // border
+        borderActive: "#5b9a6f", // brandGreen
+        checkBackground: "#5b9a6f", // brandGreen
+        checkIcon: "#ffffff",
+        label: "#173b2b", // ink
+        labelMuted: "#6f8075", // mutedSage.muted1
+      },
+      progress: {
+        track: "#dce5d9", // borderLight
+        fill: "#5b9a6f", // brandGreen
+        stepInactive: "#96a39a", // mutedSage.muted5
+        stepActive: "#173b2b", // ink
+      },
+      feedback: {
+        errorBackground: "#f8e4dc", // waterIntensity.high.background
+        errorText: "#985743", // danger
+        successBackground: "#e8f4e9", // waterIntensity.low.background
+        successText: "#3f7650", // success
+      },
+      cta: {
+        background: "#173b2b", // ink
+        backgroundDisabled: "#dce5d9", // borderLight
+        text: "#ffffff",
+        textDisabled: "#8a9b90", // mutedSage.muted3
+      },
+    },
   },
 
   typography: {

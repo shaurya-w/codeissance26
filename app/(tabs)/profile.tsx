@@ -1,10 +1,27 @@
-import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { LogOut } from "lucide-react-native";
+import { router } from "expo-router";
+import React, { useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Header } from "@/components/Header";
 import { theme } from "@/constants/theme";
+import { useOnboarding } from "@/context/OnboardingContext";
 
 export default function ProfileScreen() {
+  const { signOut } = useOnboarding();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    try {
+      await signOut();
+      router.replace("/onboarding/step-1");
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Header
@@ -20,6 +37,27 @@ export default function ProfileScreen() {
             Manage telemetry sync, Supabase authentication, and regional benchmarks.
           </Text>
         </View>
+
+        <Pressable
+          onPress={handleSignOut}
+          disabled={isSigningOut}
+          accessibilityRole="button"
+          accessibilityLabel="Sign out and start over"
+          accessibilityState={{ disabled: isSigningOut, busy: isSigningOut }}
+          style={({ pressed }) => [
+            styles.signOutButton,
+            pressed && !isSigningOut && styles.signOutButtonPressed,
+          ]}
+        >
+          {isSigningOut ? (
+            <ActivityIndicator color={theme.colors.onboarding.feedback.errorText} />
+          ) : (
+            <>
+              <LogOut size={18} color={theme.colors.onboarding.feedback.errorText} />
+              <Text style={styles.signOutText}>Sign out / Start over</Text>
+            </>
+          )}
+        </Pressable>
       </View>
     </View>
   );
@@ -33,6 +71,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: theme.spacing.md,
+    gap: theme.spacing.md,
   },
   card: {
     backgroundColor: theme.colors.surface,
@@ -60,5 +99,21 @@ const styles = StyleSheet.create({
     color: theme.colors.mutedSage.muted1,
     lineHeight: 20,
   },
+  signOutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.spacing.sm,
+    height: 52,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.onboarding.feedback.errorBackground,
+  },
+  signOutButtonPressed: {
+    opacity: 0.85,
+  },
+  signOutText: {
+    fontSize: theme.fontSize.md,
+    fontWeight: theme.typography.fontWeights.bold,
+    color: theme.colors.onboarding.feedback.errorText,
+  },
 });
-
