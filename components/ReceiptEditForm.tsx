@@ -20,7 +20,7 @@ import { Check, AlertTriangle } from "lucide-react-native";
 
 import { theme } from "@/constants/theme";
 import { ReceiptData, TransactionType } from "@/types/receipt";
-import { sendToClassify } from "@/lib/api/classifyApi";
+import { sendToClassify } from "@/services/classifyApi";
 
 // Static User ID for all submissions
 const DEFAULT_USER_ID = "97fc9b68-f8b6-497f-8dc4-a6829af235f7";

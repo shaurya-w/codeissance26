@@ -37,7 +37,14 @@ export default function TabsLayout() {
         }}
       /> */}
       <Tabs.Screen
-        name="tax"
+        name="scan"
+        options={{
+          title: "Scan",
+          tabBarIcon: ({ color, size }) => <ScanLine color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="explore"
         options={{
           title: "Tax",
           tabBarIcon: ({ color, size }) => <Compass color={color} size={size} />,
