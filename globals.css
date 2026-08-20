@@ -1,49 +1,102 @@
 /**
  * globals.css
  * -----------
- * Single source of truth for the app's design tokens: colors, typography,
- * spacing, and radii.
+ * CSS reference token mirror for the app's design tokens: colors, typography,
+ * spacing, radii, and shadows.
  *
- * React Native does NOT load CSS files or parse CSS variables at runtime,
- * so this file does not style anything by itself. It exists so that:
- *
- *   1. All design decisions live in ONE place, in a format that's easy to
- *      scan and easy to hand to a designer.
- *   2. `constants/theme.ts` mirrors these exact values as a plain JS object
- *      that React Native components import and use.
- *
- * When you change a value here, update the matching value in
- * `constants/theme.ts` so the two stay in sync.
+ * `constants/theme.ts` is the active source of truth consumed by React Native components.
+ * Keep both in sync.
  */
 
 :root {
-  /* Colors */
-  --color-background: #0b41ac;
-  --color-surface: #FFFFFF;
-  --color-primary: #46e566;
-  --color-secondary: #14B8A6;
-  --color-text: #111827;
-  --color-text-muted: #6B7280;
-  --color-border: #E5E7EB;
-  --color-success: #16A34A;
-  --color-danger: #DC2626;
+  /* Core Colors */
+  --color-page-bg: #f4f7ef;
+  --color-ink: #173b2b;
+  --color-tank-dark: #102f23;
+  --color-brand-green: #5b9a6f;
+  --color-water-green: #62bd8b;
+  --color-water-green-light: #8bd8a8;
+
+  /* Surfaces */
+  --color-surface: #ffffff;
+  --color-surface-subtle: #edf2e8;
+  --color-surface-dark: #102f23;
+
+  /* Muted Sage Scale */
+  --color-muted-sage-1: #6f8075;
+  --color-muted-sage-2: #829087;
+  --color-muted-sage-3: #8a9b90;
+  --color-muted-sage-4: #91a097;
+  --color-muted-sage-5: #96a39a;
+
+  /* Borders */
+  --color-border: #d9e3d7;
+  --color-border-light: #dce5d9;
+  --color-border-muted: #d6e1d4;
+  --color-border-subtle: #e0e7de;
+
+  /* Water Intensity Badges */
+  --color-water-low-bg: #e8f4e9;
+  --color-water-low-text: #3f7650;
+  --color-water-medium-bg: #fff4d9;
+  --color-water-medium-text: #92703b;
+  --color-water-high-bg: #f8e4dc;
+  --color-water-high-text: #985743;
+
+  /* Comparison Indicators */
+  --color-india-avg: #f3d78e;
+  --color-above-avg-bg: #5d472a;
+  --color-above-avg-text: #ffd998;
+  --color-below-avg-bg: #24563d;
+  --color-below-avg-text: #9be1b5;
+
+  /* Food Card Pastel Swatches */
+  --food-swatch-0: #dcefdc;
+  --food-swatch-1: #f4e8c1;
+  --food-swatch-2: #fff0b8;
+  --food-swatch-3: #e3ede3;
+  --food-swatch-4: #fbead2;
+  --food-swatch-5: #e5f2e8;
+  --food-swatch-6: #fef3c7;
+  --food-swatch-7: #e8e5d8;
+  --food-swatch-8: #fee2e2;
+  --food-swatch-9: #ecfdf5;
+  --food-swatch-10: #f3f4f6;
+  --food-swatch-11: #ede9fe;
+  --food-swatch-12: #fef9c3;
+  --food-swatch-13: #dcfce7;
+  --food-swatch-14: #f1f5f9;
+  --food-swatch-15: #fae8ff;
+  --food-swatch-16: #ffedd5;
 
   /* Typography */
-  --font-size-xs: 12px;
-  --font-size-sm: 14px;
-  --font-size-md: 16px;
-  --font-size-lg: 20px;
-  --font-size-xl: 28px;
+  --font-mono: monospace;
+  --font-size-micro: 9px;
+  --font-size-xs: 10px;
+  --font-size-sm: 13px;
+  --font-size-md: 15px;
+  --font-size-lg: 18px;
+  --font-size-xl: 24px;
+  --font-size-xxl: 32px;
+  --font-size-display: 48px;
 
   /* Spacing */
+  --spacing-xxs: 2px;
   --spacing-xs: 4px;
   --spacing-sm: 8px;
   --spacing-md: 16px;
   --spacing-lg: 24px;
   --spacing-xl: 32px;
+  --spacing-xxl: 40px;
 
   /* Radius */
-  --radius-sm: 6px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
+  --radius-sm: 12px;
+  --radius-md: 20px;
+  --radius-card: 28px;
+  --radius-card-hero: 38px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-card: 0 25px 80px rgba(30, 65, 43, 0.07);
 }
+

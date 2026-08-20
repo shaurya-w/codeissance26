@@ -8,14 +8,17 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.textMuted,
+        tabBarActiveTintColor: theme.colors.ink,
+        tabBarInactiveTintColor: theme.colors.mutedSage.muted1,
         tabBarStyle: {
-          backgroundColor: theme.colors.surface,
+          backgroundColor: theme.colors.pageBg,
           borderTopColor: theme.colors.border,
+          borderTopWidth: 1,
         },
         tabBarLabelStyle: {
-          fontSize: theme.fontSize.xs,
+          fontSize: theme.fontSize.micro,
+          fontWeight: theme.typography.fontWeights.black,
+          letterSpacing: 0.5,
         },
       }}
     >
@@ -26,6 +29,13 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
         }}
       />
+      {/* <Tabs.Screen
+        name="scan"
+        options={{
+          title: "Scan",
+          tabBarIcon: ({ color, size }) => <ScanLine color={color} size={size} />,
+        }}
+      /> */}
       <Tabs.Screen
         name="scan"
         options={{
@@ -36,24 +46,25 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="explore"
         options={{
-          title: "Explore",
+          title: "Tax",
           tabBarIcon: ({ color, size }) => <Compass color={color} size={size} />,
         }}
       />
       <Tabs.Screen
-        name="activity"
+        name="advisory"
         options={{
-          title: "Activity",
-          tabBarIcon: ({ color, size }) => <Activity color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
+          title: "Advisory",
           tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
         }}
       />
+      <Tabs.Screen
+        name="expenses"
+        options={{
+          title: "Expenses",
+          tabBarIcon: ({ color, size }) => <Activity color={color} size={size} />,
+        }}
+      />
+      
     </Tabs>
   );
 }
