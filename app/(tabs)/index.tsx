@@ -254,6 +254,10 @@ export default function HomeScreen() {
         eyebrow="Financial Intelligence"
         title="Dashboard"
         subtitle="Tax estimates & real-time liabilities"
+        onMenuClose={() => {
+          fetchLatestTaxEstimate();
+          fetchTransactionsSummary();
+        }}
       />
       <ScrollView
         style={styles.scroll}

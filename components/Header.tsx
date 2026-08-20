@@ -19,11 +19,12 @@ type HeaderProps = {
   eyebrow?: string;
   title?: string;
   subtitle?: string;
+  onMenuClose?: () => void;
 };
 
 const URGENT_TEXT = "#985743";
 
-export function Header({ eyebrow, title, subtitle }: HeaderProps) {
+export function Header({ eyebrow, title, subtitle, onMenuClose }: HeaderProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -126,7 +127,10 @@ export function Header({ eyebrow, title, subtitle }: HeaderProps) {
 
       <HamburgerMenu
         visible={menuOpen}
-        onClose={() => setMenuOpen(false)}
+        onClose={() => {
+          setMenuOpen(false);
+          if (onMenuClose) onMenuClose();
+        }}
         onSignOut={handleSignOut}
         isSigningOut={isSigningOut}
       />

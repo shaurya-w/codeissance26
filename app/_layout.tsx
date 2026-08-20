@@ -23,8 +23,8 @@ function NavigationGate() {
 
     const inOnboarding = segments[0] === "onboarding";
 
-    // Temporarily disabled onboarding gating for testing
-    /*
+  
+
     if (!state.onboardingCompleted) {
       const currentStepPath = `/onboarding/step-${state.currentStep}`;
       const currentRoute = "/" + segments.join("/");
@@ -33,7 +33,7 @@ function NavigationGate() {
       }
       return;
     }
-    */
+
 
     if (state.onboardingCompleted && inOnboarding) {
       router.replace("/(tabs)");
