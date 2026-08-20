@@ -19,6 +19,7 @@ export function PlatformSelector({ selectedPlatforms, onToggle }: PlatformSelect
           key={platform.id}
           label={platform.platformName}
           logoUri={platform.logoUri}
+          fallbackAsset={platform.fallbackAsset}
           fallbackInitial={platform.platformName.slice(0, 2)}
           selected={selectedPlatforms.includes(platform.id)}
           onPress={() => onToggle(platform.id)}

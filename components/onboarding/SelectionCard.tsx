@@ -7,6 +7,7 @@ import { theme } from "@/constants/theme";
 interface SelectionCardProps {
   label: string;
   logoUri?: string;
+  fallbackAsset?: any;
   selected: boolean;
   onPress: () => void;
   /** Used for the fallback initials badge if the logo fails to load. */
@@ -17,13 +18,17 @@ interface SelectionCardProps {
 export function SelectionCard({
   label,
   logoUri,
+  fallbackAsset,
   selected,
   onPress,
   fallbackInitial,
   multiSelect = false,
 }: SelectionCardProps) {
-  const [imageFailed, setImageFailed] = useState(false);
-  const showImage = !!logoUri && !imageFailed;
+  const [remoteImageFailed, setRemoteImageFailed] = useState(false);
+  const [fallbackImageFailed, setFallbackImageFailed] = useState(false);
+
+  const showRemote = !!logoUri && !remoteImageFailed;
+  const showFallback = !showRemote && !!fallbackAsset && !fallbackImageFailed;
 
   const accessibilityState: AccessibilityState = { selected };
 
@@ -41,12 +46,21 @@ export function SelectionCard({
       ]}
     >
       <View style={styles.logoWrap}>
-        {showImage ? (
+        {showRemote ? (
           <Image
             source={{ uri: logoUri }}
             style={styles.logo}
             resizeMode="contain"
-            onError={() => setImageFailed(true)}
+            onError={() => setRemoteImageFailed(true)}
+            accessibilityIgnoresInvertColors
+            alt={`${label} logo`}
+          />
+        ) : showFallback ? (
+          <Image
+            source={fallbackAsset}
+            style={styles.logo}
+            resizeMode="contain"
+            onError={() => setFallbackImageFailed(true)}
             accessibilityIgnoresInvertColors
             alt={`${label} logo`}
           />

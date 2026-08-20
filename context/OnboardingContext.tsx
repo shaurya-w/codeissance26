@@ -9,11 +9,22 @@ import {
   saveOnboardingState,
 } from "@/lib/onboardingStorage";
 import type { BankId, OnboardingState, PlatformId } from "@/types/onboarding";
+import { supabase } from "@/lib/supabase";
 
 interface OnboardingContextValue {
   state: OnboardingState;
   /** True once the persisted state has been read from AsyncStorage. */
   isReady: boolean;
+
+  // Step 0
+  isSubmittingStep0: boolean;
+  step0Error: string | null;
+  submitStep0: (
+    name: string,
+    email: string,
+    taxRegime: "normal" | "presumptive",
+    presumptiveScheme: "44AD" | "44ADA" | null
+  ) => Promise<boolean>;
 
   // Step 1
   selectedBank: BankId | null;
@@ -40,6 +51,8 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const [isReady, setIsReady] = useState(false);
 
   const [selectedBank, setSelectedBankState] = useState<BankId | null>(null);
+  const [isSubmittingStep0, setIsSubmittingStep0] = useState(false);
+  const [step0Error, setStep0Error] = useState<string | null>(null);
   const [isSubmittingStep1, setIsSubmittingStep1] = useState(false);
   const [step1Error, setStep1Error] = useState<string | null>(null);
 
@@ -73,6 +86,44 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       prev.includes(platform) ? prev.filter((p) => p !== platform) : [...prev, platform]
     );
   }, []);
+
+  const submitStep0 = useCallback(async (
+    name: string,
+    email: string,
+    taxRegime: "normal" | "presumptive",
+    presumptiveScheme: "44AD" | "44ADA" | null
+  ): Promise<boolean> => {
+    if (isSubmittingStep0) return false;
+
+    setIsSubmittingStep0(true);
+    setStep0Error(null);
+    try {
+      const { error } = await supabase
+        .from("users")
+        .upsert({
+          id: "97fc9b68-f8b6-497f-8dc4-a6829af235f7",
+          name,
+          email,
+          tax_regime: taxRegime,
+          presumptive_scheme: taxRegime === "normal" ? null : presumptiveScheme,
+        });
+
+      if (error) {
+        throw new Error(error.message || "Failed to create/update user.");
+      }
+
+      await persist({
+        ...state,
+        currentStep: 1,
+      });
+      return true;
+    } catch (err) {
+      setStep0Error(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      return false;
+    } finally {
+      setIsSubmittingStep0(false);
+    }
+  }, [isSubmittingStep0, persist, state]);
 
   const submitStep1 = useCallback(async (): Promise<boolean> => {
     if (!selectedBank || isSubmittingStep1) return false;
@@ -133,6 +184,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       value={{
         state,
         isReady,
+        isSubmittingStep0,
+        step0Error,
+        submitStep0,
         selectedBank,
         setSelectedBank,
         isSubmittingStep1,

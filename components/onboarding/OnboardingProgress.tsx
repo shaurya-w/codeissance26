@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { theme } from "@/constants/theme";
 
 interface OnboardingProgressProps {
-  currentStep: 1 | 2;
+  currentStep: 0 | 1 | 2;
   totalSteps?: number;
 }
 

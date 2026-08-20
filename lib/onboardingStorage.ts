@@ -4,7 +4,7 @@ import type { OnboardingState } from "@/types/onboarding";
 const STORAGE_KEY = "gig:onboardingState";
 
 export const DEFAULT_ONBOARDING_STATE: OnboardingState = {
-  currentStep: 1,
+  currentStep: 0,
   onboardingCompleted: false,
   selectedBank: null,
   selectedPlatforms: [],

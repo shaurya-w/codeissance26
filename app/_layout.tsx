@@ -24,7 +24,13 @@ function NavigationGate() {
     const inOnboarding = segments[0] === "onboarding";
 
     if (!state.onboardingCompleted && !inOnboarding) {
-      router.replace(state.currentStep === 2 ? "/onboarding/step-2" : "/onboarding/step-1");
+      if (state.currentStep === 2) {
+        router.replace("/onboarding/step-2");
+      } else if (state.currentStep === 1) {
+        router.replace("/onboarding/step-1");
+      } else {
+        router.replace("/onboarding/step-0");
+      }
       return;
     }
 
