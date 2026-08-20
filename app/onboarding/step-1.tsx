@@ -4,12 +4,12 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { OnboardingFooter } from "@/components/onboarding/OnboardingFooter";
 import { OnboardingLayout } from "@/components/onboarding/OnboardingLayout";
-import { BankSelector } from "@/components/onboarding/BankSelector";
+import { PlatformSelector } from "@/components/onboarding/PlatformSelector";
 import { theme } from "@/constants/theme";
 import { useOnboarding } from "@/context/OnboardingContext";
 
 export default function OnboardingStep1Screen() {
-  const { selectedBank, setSelectedBank, isSubmittingStep1, step1Error, submitStep1 } =
+  const { selectedPlatforms, togglePlatform, isSubmittingStep1, step1Error, submitStep1 } =
     useOnboarding();
 
   const handleContinue = async () => {
@@ -24,26 +24,26 @@ export default function OnboardingStep1Screen() {
       step={1}
       eyebrow="Getting set up"
       title="Onboarding"
-      subtitle="Connect your bank so we can track income and expenses automatically."
+      subtitle="Tell us which gig platforms you work with."
       footer={
         <OnboardingFooter
           ctaLabel="Continue"
           onPress={handleContinue}
-          disabled={!selectedBank}
+          disabled={selectedPlatforms.length === 0}
           loading={isSubmittingStep1}
           error={step1Error}
         />
       }
     >
       <View style={styles.intro}>
-        <Text style={styles.headline}>Link your bank</Text>
+        <Text style={styles.headline}>Your platforms</Text>
         <Text style={styles.subtext}>
-          Choose the bank your gig income lands in. This lets us surface your real cash flow —
-          nothing is shared beyond what's needed to categorize transactions.
+          Pick every platform you earn from. You can select more than one — we'll pull in payout
+          data for each.
         </Text>
       </View>
 
-      <BankSelector selectedBank={selectedBank} onSelect={setSelectedBank} />
+      <PlatformSelector selectedPlatforms={selectedPlatforms} onToggle={togglePlatform} />
     </OnboardingLayout>
   );
 }
