@@ -8,16 +8,16 @@ export default function ExploreScreen() {
   return (
     <View style={styles.container}>
       <Header
-        eyebrow="Crop Explorer"
-        title="Explore"
-        subtitle="Search and benchmark agricultural water intensity"
+        eyebrow="Tax Optimization"
+        title="Tax"
+        subtitle="Tax Reports"
       />
       <View style={styles.content}>
         <View style={styles.card}>
-          <Text style={styles.cardEyebrow}>REGIONAL DATABASE</Text>
-          <Text style={styles.cardHeading}>Discover Crops</Text>
+          <Text style={styles.cardEyebrow}>TAX DATABASE</Text>
+          <Text style={styles.cardHeading}>Discover</Text>
           <Text style={styles.body}>
-            Compare water footprints across origins, soil zones, and harvest seasons.
+            Something...
           </Text>
         </View>
       </View>

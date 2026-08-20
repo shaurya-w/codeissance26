@@ -25,39 +25,18 @@ export default function ProfileScreen() {
   return (
     <View style={styles.container}>
       <Header
-        eyebrow="Account & Preferences"
+        eyebrow="Advisory"
         title="Profile"
         subtitle="User credentials and environmental parameters"
       />
       <View style={styles.content}>
         <View style={styles.card}>
-          <Text style={styles.cardEyebrow}>ACCOUNT DETAILS</Text>
-          <Text style={styles.cardHeading}>User Settings</Text>
+          <Text style={styles.cardEyebrow}>ADVISORY DB</Text>
+          <Text style={styles.cardHeading}>Something</Text>
           <Text style={styles.body}>
-            Manage telemetry sync, Supabase authentication, and regional benchmarks.
+            Something..
           </Text>
         </View>
-
-        <Pressable
-          onPress={handleSignOut}
-          disabled={isSigningOut}
-          accessibilityRole="button"
-          accessibilityLabel="Sign out and start over"
-          accessibilityState={{ disabled: isSigningOut, busy: isSigningOut }}
-          style={({ pressed }) => [
-            styles.signOutButton,
-            pressed && !isSigningOut && styles.signOutButtonPressed,
-          ]}
-        >
-          {isSigningOut ? (
-            <ActivityIndicator color={theme.colors.onboarding.feedback.errorText} />
-          ) : (
-            <>
-              <LogOut size={18} color={theme.colors.onboarding.feedback.errorText} />
-              <Text style={styles.signOutText}>Sign out / Start over</Text>
-            </>
-          )}
-        </Pressable>
       </View>
     </View>
   );
