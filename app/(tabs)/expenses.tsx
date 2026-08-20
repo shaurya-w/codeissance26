@@ -1002,10 +1002,10 @@ export default function ExpensesScreen() {
                 </View>
 
                 <View style={styles.expenseCount}>
-                  <Text style={styles.expenseCountText}>
+                  {/* <Text style={styles.expenseCountText}>
                     {expenseTransactions.length}
-                  </Text>
-                  <Text style={styles.expenseCountLabel}>expenses</Text>
+                  </Text> */}
+                  {/* <Text style={styles.expenseCountLabel}>expenses</Text> */}
                 </View>
               </View>
 
