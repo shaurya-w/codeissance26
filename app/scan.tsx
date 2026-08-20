@@ -21,6 +21,7 @@ import { Header } from "@/components/Header";
 import { ReceiptEditForm } from "@/components/ReceiptEditForm";
 import { theme } from "@/constants/theme";
 import { extractReceiptData } from "@/lib/api/geminiOcr";
+import { supabase } from "@/lib/supabase"; // Implemented Supabase Client
 import { ReceiptData } from "@/types/receipt";
 
 type ScanStep = "pick" | "processing" | "review";
@@ -57,14 +58,40 @@ export default function ScanScreen() {
 
     try {
       const data = await extractReceiptData(base64, mimeType);
-      // Ensure transaction_type defaults strictly to EXPENSE
       setReceiptData({ ...data, transaction_type: "EXPENSE" });
       setStep("review");
     } catch (err: any) {
       console.warn("OCR failed:", err.message);
       setOcrError(err.message);
-      // Fall back to manual entry with EXPENSE
-      setReceiptData({ ...EMPTY_RECEIPT, source_type: "MANUAL", transaction_type: "EXPENSE" });
+
+      const fallbackPayload: ReceiptData = {
+        ...EMPTY_RECEIPT,
+        source_type: "RECEIPT_OCR",
+        transaction_type: "EXPENSE",
+      };
+
+      setReceiptData(fallbackPayload);
+
+      // Log pending action directly to Supabase on failure
+      try {
+        const { error: dbError } = await supabase.from("pending_actions").insert([
+          {
+            user_id: MOCK_USER_ID,
+            agent_name: "ClassificationAgent",
+            action_type: "CLASSIFY_TRANSACTION",
+            proposed_payload: JSON.stringify(fallbackPayload),
+            agent_reasoning: `OCR Extraction Failed: ${err.message}. Low clarity or missing details.`,
+            status: "PENDING",
+          },
+        ]);
+
+        if (dbError) {
+          console.error("Failed to insert pending action:", dbError.message);
+        }
+      } catch (dbErr) {
+        console.error("Database connection error:", dbErr);
+      }
+
       setStep("review");
     }
   };
@@ -115,7 +142,6 @@ export default function ScanScreen() {
     setStep("review");
   };
 
-  // ── Pick step ──────────────────────────────────────────────────────────
   if (step === "pick") {
     return (
       <View style={styles.container}>
@@ -163,7 +189,6 @@ export default function ScanScreen() {
     );
   }
 
-  // ── Processing step ────────────────────────────────────────────────────
   if (step === "processing") {
     return (
       <View style={styles.container}>
@@ -186,14 +211,13 @@ export default function ScanScreen() {
     );
   }
 
-  // ── Review step ────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <Header title="Scan Receipt" />
       {ocrError && (
         <View style={styles.ocrWarning}>
           <Text style={styles.ocrWarningText}>
-            ⚠️ AI extraction failed: {ocrError}{"\n"}Please enter details manually.
+            ⚠️ AI extraction failed: {ocrError}{"\n"}A pending review action has been added to your queue.
           </Text>
         </View>
       )}
@@ -204,11 +228,8 @@ export default function ScanScreen() {
         userId={MOCK_USER_ID}
         initialData={receiptData}
         onReset={resetFlow}
-        onSuccess={() => {
-          // Stay on the success screen shown by ReceiptEditForm
-        }}
+        onSuccess={() => { }}
       />
-      
     </View>
   );
 }
@@ -218,8 +239,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-
-  // ── Pick step ──
   pickContent: {
     flex: 1,
     justifyContent: "center",
@@ -297,8 +316,6 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.sm,
     fontWeight: "500",
   },
-
-  // ── Processing step ──
   processingContent: {
     flex: 1,
     justifyContent: "center",
@@ -326,8 +343,6 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.sm,
     color: theme.colors.textMuted,
   },
-
-  // ── Review step ──
   ocrWarning: {
     backgroundColor: "#FFFBEB",
     padding: theme.spacing.sm,

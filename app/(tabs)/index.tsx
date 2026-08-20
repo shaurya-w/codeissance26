@@ -1,12 +1,38 @@
-import React from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import { Header } from "@/components/Header";
+import { TaxDeadlineBanner } from "@/components/TaxDeadlineBanner";
 import { theme } from "@/constants/theme";
-import { useOnboarding } from "@/context/OnboardingContext";
+import { supabase } from "@/lib/supabase";
+
+export type TaxEstimate = {
+  id: string;
+  user_id: string | null;
+  total_taxable_income: string | number;
+  estimated_liability: string | number;
+  tds_credits_applied: string | number;
+  rag_context_used:
+  | {
+    regime?: string;
+    standard_deduction?: number;
+    agricultural_exemption?: string;
+    notes?: string;
+  }
+  | string;
+  calculated_at: string;
+};
+
+const DEFAULT_USER_ID = "97fc9b68-f8b6-497f-8dc4-a6829af235f7";
 
 function formatCurrency(amount: number): string {
-  return `₹${amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  return `₹${amount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 }
 
 function formatDate(iso: string): string {
@@ -14,110 +40,223 @@ function formatDate(iso: string): string {
     return new Date(iso).toLocaleDateString("en-IN", {
       day: "2-digit",
       month: "short",
+      year: "numeric",
     });
   } catch {
     return iso;
   }
 }
 
+// Safely parse single or double-stringified JSON objects from Supabase
+const parseRagContext = (rawContext: any) => {
+  if (!rawContext) return {};
+  let context = rawContext;
+
+  while (typeof context === "string") {
+    try {
+      context = JSON.parse(context);
+    } catch {
+      break;
+    }
+  }
+  return context;
+};
+
 export default function HomeScreen() {
-  const { state } = useOnboarding();
-  const { bankFeedResult, gigPayoutResults } = state;
+  const [estimate, setEstimate] = useState<TaxEstimate | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    fetchLatestTaxEstimate();
+  }, []);
+
+  const fetchLatestTaxEstimate = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("tax_estimates")
+        .select("*")
+        .eq("user_id", DEFAULT_USER_ID)
+        .order("calculated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error fetching tax estimate:", error.message, error.details);
+      } else {
+        setEstimate(data as TaxEstimate | null);
+      }
+    } catch (err) {
+      console.error("Failed to load tax estimate:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Safe number conversions for numeric database strings
+  const grossIncome = estimate?.total_taxable_income
+    ? parseFloat(String(estimate.total_taxable_income))
+    : 0;
+  const grossLiability = estimate?.estimated_liability
+    ? parseFloat(String(estimate.estimated_liability))
+    : 0;
+  const tdsCredits = estimate?.tds_credits_applied
+    ? parseFloat(String(estimate.tds_credits_applied))
+    : 0;
+  const netPayable = Math.max(0, grossLiability - tdsCredits);
+
+  // Parse rag_context_used safely
+  const ragContext = parseRagContext(estimate?.rag_context_used);
+
+  const liabilityPercent =
+    grossIncome > 0 ? (grossLiability / grossIncome) * 100 : 0;
+  const tdsPercent =
+    grossLiability > 0 ? (tdsCredits / grossLiability) * 100 : 0;
 
   return (
     <View style={styles.container}>
       <Header
-        eyebrow="Water Intelligence"
+        eyebrow="Financial Intelligence"
         title="Dashboard"
-        subtitle="Crop & water consumption analytics"
+        subtitle="Tax estimates & real-time liabilities"
       />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        
-        {gigPayoutResults && gigPayoutResults.length > 0 ? (
-          <View style={styles.dataCard}>
-            <View style={styles.dataCardHeader}>
-              <Text style={styles.microLabel}>GIG PAYOUTS</Text>
-              <Text style={styles.microLabel}>{gigPayoutResults.length} LINKED</Text>
-            </View>
+        <TaxDeadlineBanner />
 
-            {gigPayoutResults.map((result, index) => (
-              <View key={result.data.id}>
-                <View style={styles.metricRow}>
-                  <Text style={styles.monoMetric}>{formatCurrency(result.data.expected_net)}</Text>
-                  <Text style={styles.monoUnit}>net</Text>
-                </View>
-                <Text style={styles.contextText}>{result.message}</Text>
-
-                <View style={styles.dashedDivider} />
-
-                <View style={styles.benchmarkRow}>
-                  <View style={styles.benchmarkItem}>
-                    <Text style={styles.microLabel}>GROSS</Text>
-                    <Text style={[styles.benchmarkValue, { color: theme.colors.ink }]}>
-                      {formatCurrency(result.data.expected_gross)}
-                    </Text>
-                  </View>
-                  <View style={styles.benchmarkItem}>
-                    <Text style={styles.microLabel}>PLATFORM FEE</Text>
-                    <Text style={[styles.benchmarkValue, { color: theme.colors.danger }]}>
-                      -{formatCurrency(result.data.platform_fee)}
-                    </Text>
-                  </View>
-                  <View style={styles.benchmarkItem}>
-                    <Text style={styles.microLabel}>TDS</Text>
-                    <Text style={[styles.benchmarkValue, { color: theme.colors.warning }]}>
-                      -{formatCurrency(result.data.tds_deducted)}
-                    </Text>
-                  </View>
-                </View>
-
-                {index < gigPayoutResults.length - 1 && <View style={styles.dashedDivider} />}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={theme.colors.brandGreen} />
+          </View>
+        ) : estimate ? (
+          <>
+            {/* Visual Tax Metric Bar Chart */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.eyebrow}>TAX METRICS SUMMARY</Text>
+                <Text style={styles.dateLabel}>
+                  {formatDate(estimate.calculated_at)}
+                </Text>
               </View>
-            ))}
-          </View>
-        ) : null}
 
-        {bankFeedResult && bankFeedResult.data.length > 0 ? (
-          <View style={styles.dataCard}>
-            <View style={styles.dataCardHeader}>
-              <Text style={styles.microLabel}>RECENT BANK ACTIVITY</Text>
-              <Text style={styles.microLabel}>{bankFeedResult.total_processed} SYNCED</Text>
+              {/* Net Tax Hero Value */}
+              <View style={styles.heroRow}>
+                <View>
+                  <Text style={styles.subtext}>Estimated Net Payable</Text>
+                  <Text style={styles.netAmount}>{formatCurrency(netPayable)}</Text>
+                </View>
+                <View style={styles.regimeBadge}>
+                  <Text style={styles.regimeBadgeText}>
+                    {ragContext?.regime || "New Tax Regime"}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.dashedDivider} />
+
+              {/* Visual Bar Graph */}
+              <Text style={styles.sectionLabel}>Liability vs. Income Scale</Text>
+
+              {/* Taxable Income Bar */}
+              <View style={styles.barContainer}>
+                <View style={styles.barLabelRow}>
+                  <Text style={styles.barLabel}>Taxable Income</Text>
+                  <Text style={styles.barValue}>{formatCurrency(grossIncome)}</Text>
+                </View>
+                <View style={styles.track}>
+                  <View
+                    style={[
+                      styles.fill,
+                      { width: "100%", backgroundColor: theme.colors.brandGreen },
+                    ]}
+                  />
+                </View>
+              </View>
+
+              {/* Estimated Liability Bar */}
+              <View style={styles.barContainer}>
+                <View style={styles.barLabelRow}>
+                  <Text style={styles.barLabel}>Gross Liability</Text>
+                  <Text style={styles.barValue}>{formatCurrency(grossLiability)}</Text>
+                </View>
+                <View style={styles.track}>
+                  <View
+                    style={[
+                      styles.fill,
+                      {
+                        width: `${Math.min(100, Math.max(12, liabilityPercent * 2.5))}%`,
+                        backgroundColor: theme.colors.danger,
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
+
+              {/* TDS Credits Bar */}
+              <View style={styles.barContainer}>
+                <View style={styles.barLabelRow}>
+                  <Text style={styles.barLabel}>TDS Credits Offset</Text>
+                  <Text style={styles.barValue}>-{formatCurrency(tdsCredits)}</Text>
+                </View>
+                <View style={styles.track}>
+                  <View
+                    style={[
+                      styles.fill,
+                      {
+                        width: `${Math.min(100, Math.max(10, tdsPercent))}%`,
+                        backgroundColor: theme.colors.warning,
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
             </View>
 
-            {bankFeedResult.data.map((txn, index) => {
-              const isIncome = txn.type === "INCOME";
-              const badgeColors = isIncome
-                ? theme.colors.belowAverage
-                : theme.colors.aboveAverage;
+            {/* Detailed Breakdown Card */}
+            <View style={styles.card}>
+              <Text style={styles.eyebrow}>TAX BREAKDOWN DETAILS</Text>
 
-              return (
-                <View key={txn.id}>
-                  <View style={styles.benchmarkRow}>
-                    <View style={styles.benchmarkItem}>
-                      <Text style={styles.contextText}>{formatDate(txn.date)}</Text>
-                      <Text style={styles.microLabel}>{txn.category.replace(/_/g, " ")}</Text>
-                    </View>
-                    <View style={[styles.avgBadge, { backgroundColor: badgeColors.background }]}>
-                      <Text
-                        style={[
-                          styles.avgBadgeText,
-                          { color: badgeColors.text },
-                        ]}
-                      >
-                        {isIncome ? "+" : "-"}
-                        {formatCurrency(txn.amount)}
-                      </Text>
-                    </View>
-                  </View>
-                  {index < bankFeedResult.data.length - 1 && <View style={styles.dashedDivider} />}
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Total Taxable Income</Text>
+                <Text style={styles.breakdownValue}>{formatCurrency(grossIncome)}</Text>
+              </View>
+
+              <View style={styles.dashedDivider} />
+
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Estimated Tax Liability</Text>
+                <Text style={[styles.breakdownValue, { color: theme.colors.danger }]}>
+                  {formatCurrency(grossLiability)}
+                </Text>
+              </View>
+
+              <View style={styles.dashedDivider} />
+
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>TDS Credits Applied</Text>
+                <Text style={[styles.breakdownValue, { color: theme.colors.warning }]}>
+                  -{formatCurrency(tdsCredits)}
+                </Text>
+              </View>
+
+              <View style={styles.dashedDivider} />
+
+              <View style={styles.breakdownRow}>
+                <Text style={styles.boldLabel}>Net Outstanding Liability</Text>
+                <Text style={styles.boldValue}>{formatCurrency(netPayable)}</Text>
+              </View>
+
+              {ragContext?.notes && (
+                <View style={styles.notesBox}>
+                  <Text style={styles.notesTitle}>AI Reasoning & Context</Text>
+                  <Text style={styles.notesText}>{ragContext.notes}</Text>
                 </View>
-              );
-            })}
-          </View>
+              )}
+            </View>
+          </>
         ) : null}
       </ScrollView>
     </View>
@@ -137,37 +276,11 @@ const styles = StyleSheet.create({
     gap: theme.spacing.lg,
     paddingBottom: theme.spacing.xxl,
   },
-  heroSection: {
-    marginTop: theme.spacing.xs,
-    gap: theme.spacing.xxs,
+  loadingContainer: {
+    paddingVertical: theme.spacing.xl,
+    alignItems: "center",
   },
-  heroEyebrow: {
-    fontSize: theme.typography.eyebrow.fontSize,
-    fontWeight: theme.typography.eyebrow.fontWeight,
-    letterSpacing: theme.typography.eyebrow.letterSpacing,
-    textTransform: theme.typography.eyebrow.textTransform,
-    color: theme.colors.brandGreen,
-  },
-  heroHeadline: {
-    fontSize: theme.typography.displayHeadline.fontSize,
-    fontWeight: theme.typography.displayHeadline.fontWeight,
-    letterSpacing: theme.typography.displayHeadline.letterSpacing,
-    lineHeight: theme.typography.displayHeadline.lineHeight,
-    color: theme.colors.ink,
-  },
-  heroHeadlineAccent: {
-    fontSize: theme.typography.displayHeadline.fontSize,
-    fontWeight: theme.typography.displayHeadline.fontWeight,
-    letterSpacing: theme.typography.displayHeadline.letterSpacing,
-    lineHeight: theme.typography.displayHeadline.lineHeight,
-    color: theme.colors.brandGreen,
-  },
-  heroSub: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.mutedSage.muted1,
-    marginTop: theme.spacing.xs,
-  },
-  dataCard: {
+  card: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.card,
     padding: theme.spacing.lg,
@@ -176,39 +289,49 @@ const styles = StyleSheet.create({
     ...theme.shadows.card,
     gap: theme.spacing.sm,
   },
-  dataCardHeader: {
+  cardHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  microLabel: {
+  eyebrow: {
     fontSize: theme.typography.eyebrow.fontSize,
     fontWeight: theme.typography.eyebrow.fontWeight,
     letterSpacing: theme.typography.eyebrow.letterSpacing,
-    textTransform: theme.typography.eyebrow.textTransform,
     color: theme.colors.mutedSage.muted1,
   },
-  metricRow: {
+  dateLabel: {
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.mutedSage.muted3,
+  },
+  heroRow: {
     flexDirection: "row",
-    alignItems: "baseline",
-    gap: theme.spacing.xs,
+    alignItems: "flex-end",
+    justifyContent: "space-between",
     marginTop: theme.spacing.xs,
   },
-  monoMetric: {
-    fontFamily: theme.typography.fontMono,
+  subtext: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.mutedSage.muted1,
+  },
+  netAmount: {
     fontSize: theme.fontSize.xxl,
     fontWeight: theme.typography.fontWeights.black,
     color: theme.colors.ink,
-  },
-  monoUnit: {
     fontFamily: theme.typography.fontMono,
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.typography.fontWeights.semibold,
-    color: theme.colors.mutedSage.muted1,
   },
-  contextText: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.mutedSage.muted2,
+  regimeBadge: {
+    backgroundColor: theme.colors.surfaceSubtle,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  regimeBadgeText: {
+    fontSize: theme.fontSize.xs,
+    fontWeight: theme.typography.fontWeights.bold,
+    color: theme.colors.brandGreen,
   },
   dashedDivider: {
     height: 1,
@@ -217,28 +340,81 @@ const styles = StyleSheet.create({
     borderStyle: "dashed",
     marginVertical: theme.spacing.xs,
   },
-  benchmarkRow: {
+  sectionLabel: {
+    fontSize: theme.fontSize.xs,
+    fontWeight: theme.typography.fontWeights.bold,
+    color: theme.colors.ink,
+  },
+  barContainer: {
+    gap: theme.spacing.xxs,
+  },
+  barLabelRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  barLabel: {
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.mutedSage.muted1,
+  },
+  barValue: {
+    fontSize: theme.fontSize.xs,
+    fontWeight: theme.typography.fontWeights.bold,
+    fontFamily: theme.typography.fontMono,
+    color: theme.colors.ink,
+  },
+  track: {
+    height: 8,
+    width: "100%",
+    backgroundColor: theme.colors.surfaceSubtle,
+    borderRadius: theme.radius.full,
+    overflow: "hidden",
+  },
+  fill: {
+    height: "100%",
+    borderRadius: theme.radius.full,
+  },
+  breakdownRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  benchmarkItem: {
-    gap: theme.spacing.xxs,
+  breakdownLabel: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.mutedSage.muted1,
   },
-  benchmarkValue: {
-    fontFamily: theme.typography.fontMono,
+  breakdownValue: {
     fontSize: theme.fontSize.sm,
     fontWeight: theme.typography.fontWeights.bold,
+    fontFamily: theme.typography.fontMono,
+    color: theme.colors.ink,
   },
-  avgBadge: {
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.radius.full,
+  boldLabel: {
+    fontSize: theme.fontSize.md,
+    fontWeight: theme.typography.fontWeights.bold,
+    color: theme.colors.ink,
   },
-  avgBadgeText: {
-    fontSize: theme.fontSize.micro,
+  boldValue: {
+    fontSize: theme.fontSize.md,
     fontWeight: theme.typography.fontWeights.black,
-    letterSpacing: 1,
-    textTransform: "uppercase",
+    fontFamily: theme.typography.fontMono,
+    color: theme.colors.ink,
+  },
+  notesBox: {
+    marginTop: theme.spacing.xs,
+    padding: theme.spacing.sm,
+    backgroundColor: theme.colors.surfaceSubtle,
+    borderRadius: theme.radius.sm,
+    gap: theme.spacing.xxs,
+  },
+  notesTitle: {
+    fontSize: theme.fontSize.xs,
+    fontWeight: theme.typography.fontWeights.bold,
+    color: theme.colors.brandGreen,
+  },
+  notesText: {
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.mutedSage.muted1,
+    lineHeight: 16,
   },
 });

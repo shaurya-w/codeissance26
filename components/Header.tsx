@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -8,12 +8,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import {
-  Bell,
-  ScanLine,
-} from "lucide-react-native";
+import { Bell, ScanLine } from "lucide-react-native";
 
 import { theme } from "@/constants/theme";
+import { supabase } from "@/lib/supabase";
 import { HamburgerMenu } from "@/components/HamburgerMenu";
 
 type HeaderProps = {
@@ -22,15 +20,33 @@ type HeaderProps = {
   subtitle?: string;
 };
 
-export function Header({
-  eyebrow,
-  title,
-  subtitle,
-}: HeaderProps) {
+const URGENT_TEXT = "#985743";
+
+export function Header({ eyebrow, title, subtitle }: HeaderProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState<number>(0);
+
+  useEffect(() => {
+    fetchPendingCount();
+  }, [menuOpen]); // Refetch when menu state changes
+
+  const fetchPendingCount = async () => {
+    try {
+      const { count, error } = await supabase
+        .from("pending_actions")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "PENDING");
+
+      if (!error && count !== null) {
+        setPendingCount(count);
+      }
+    } catch (err) {
+      console.error("Failed to fetch pending count:", err);
+    }
+  };
 
   const handleScan = () => {
     router.push("/scan");
@@ -48,23 +64,9 @@ export function Header({
       >
         {/* Page heading */}
         <View style={styles.headingContainer}>
-          {eyebrow && (
-            <Text style={styles.eyebrow}>
-              {eyebrow}
-            </Text>
-          )}
-
-          {title && (
-            <Text style={styles.title}>
-              {title}
-            </Text>
-          )}
-
-          {subtitle && (
-            <Text style={styles.subtitle}>
-              {subtitle}
-            </Text>
-          )}
+          {eyebrow && <Text style={styles.eyebrow}>{eyebrow}</Text>}
+          {title && <Text style={styles.title}>{title}</Text>}
+          {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
         </View>
 
         {/* Actions */}
@@ -89,19 +91,20 @@ export function Header({
             onPress={() => setMenuOpen(true)}
             accessibilityRole="button"
             accessibilityLabel="Open menu"
-            accessibilityState={{
-              expanded: menuOpen,
-            }}
+            accessibilityState={{ expanded: menuOpen }}
             style={({ pressed }) => [
               styles.iconButton,
               pressed && styles.iconButtonPressed,
             ]}
           >
-            <Bell
-              size={22}
-              strokeWidth={2.2}
-              color={theme.colors.ink}
-            />
+            <Bell size={22} strokeWidth={2.2} color={theme.colors.ink} />
+            {pendingCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {pendingCount > 99 ? "99+" : pendingCount}
+                </Text>
+              </View>
+            )}
           </Pressable>
         </View>
       </View>
@@ -127,19 +130,16 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border,
     zIndex: 100,
   },
-
   headingContainer: {
     flex: 1,
     justifyContent: "center",
   },
-
   eyebrow: {
     fontSize: theme.typography.eyebrow.fontSize,
     fontWeight: theme.typography.eyebrow.fontWeight,
     letterSpacing: theme.typography.eyebrow.letterSpacing,
     color: theme.colors.mutedSage.muted1,
   },
-
   title: {
     marginTop: 2,
     fontSize: theme.fontSize.xl,
@@ -147,28 +147,42 @@ const styles = StyleSheet.create({
     color: theme.colors.ink,
     letterSpacing: -0.8,
   },
-
   subtitle: {
     marginTop: 2,
     fontSize: theme.fontSize.sm,
     color: theme.colors.mutedSage.muted1,
   },
-
   actions: {
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing.xs,
   },
-
   iconButton: {
     width: 44,
     height: 44,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 22,
+    position: "relative",
   },
-
   iconButtonPressed: {
     backgroundColor: theme.colors.border,
+  },
+  badge: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: URGENT_TEXT,
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    minWidth: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: theme.typography.fontWeights.black,
   },
 });

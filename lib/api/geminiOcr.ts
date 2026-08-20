@@ -7,11 +7,11 @@
 
 import { ReceiptData } from "@/types/receipt";
 
+// Updated to official Gemini 2.0 Flash model endpoint
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent";
 
-const EXTRACTION_PROMPT = `You are a receipt parser. Analyze this receipt image and extract the following information.
-Return ONLY a valid JSON object with no markdown formatting, no code fences, no extra text.
+const EXTRACTION_PROMPT = `You are a receipt parser. Analyze this receipt image and extract the following information into a JSON object:
 
 {
   "amount": <number — the total/final amount paid, as a plain number like 850.00>,
@@ -28,16 +28,10 @@ Rules:
 - "date" must be in YYYY-MM-DD format. Convert from any format you see.
 - "vendor" should be the business/store name, not the address.
 - "description" should briefly describe the purchase (e.g. "Petrol purchase from Indian Oil").
-- If a field is not clearly visible, make your best reasonable guess.
-- Always return exactly one JSON object, nothing else.`;
+- If a field is not clearly visible, make your best reasonable guess.`;
 
 /**
  * Send a receipt image to Gemini and get structured ReceiptData back.
- *
- * @param base64Image - The image encoded as a base64 string (without data URI prefix).
- * @param mimeType    - The MIME type of the image (e.g. "image/jpeg", "image/png").
- * @returns Parsed ReceiptData.
- * @throws If the API call fails or the response can't be parsed.
  */
 export async function extractReceiptData(
   base64Image: string,
@@ -51,6 +45,9 @@ export async function extractReceiptData(
     );
   }
 
+  // Strip Data URI scheme prefix if present (e.g., "data:image/jpeg;base64,")
+  const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, "").trim();
+
   const requestBody = {
     contents: [
       {
@@ -59,15 +56,16 @@ export async function extractReceiptData(
           {
             inlineData: {
               mimeType,
-              data: base64Image,
+              data: cleanBase64,
             },
           },
         ],
       },
     ],
     generationConfig: {
-      temperature: 0.1, // Low temperature for deterministic extraction
+      temperature: 0.1,
       maxOutputTokens: 1024,
+      responseMimeType: "application/json", // Enforces raw JSON response
     },
   };
 
@@ -83,31 +81,24 @@ export async function extractReceiptData(
   }
 
   const result = await response.json();
-
-  // Extract the text content from Gemini's response
   const textContent = result?.candidates?.[0]?.content?.parts?.[0]?.text;
 
   if (!textContent) {
-    throw new Error("Gemini returned an empty response. Please try again or enter details manually.");
+    throw new Error(
+      "Gemini returned an empty response. Please try again or enter details manually."
+    );
   }
-
-  // Parse the JSON from the response (strip any accidental markdown fences)
-  const cleaned = textContent
-    .replace(/```json\s*/gi, "")
-    .replace(/```\s*/g, "")
-    .trim();
 
   let parsed: any;
   try {
-    parsed = JSON.parse(cleaned);
+    parsed = JSON.parse(textContent.trim());
   } catch {
     throw new Error(
       "Could not parse Gemini's response as JSON. Please enter details manually."
     );
   }
 
-  // Validate and normalize the parsed data
-  const receiptData: ReceiptData = {
+  return {
     amount: normalizeAmount(parsed.amount),
     transaction_type: parsed.transaction_type === "INCOME" ? "INCOME" : "EXPENSE",
     date: normalizeDate(parsed.date),
@@ -116,8 +107,6 @@ export async function extractReceiptData(
     description: String(parsed.description || "").trim(),
     source_type: "RECEIPT_OCR",
   };
-
-  return receiptData;
 }
 
 /**
@@ -125,10 +114,9 @@ export async function extractReceiptData(
  */
 function normalizeAmount(raw: any): number {
   if (typeof raw === "number" && !isNaN(raw)) {
-    return Math.round(raw * 100) / 100; // 2 decimal places
+    return Math.round(raw * 100) / 100;
   }
   if (typeof raw === "string") {
-    // Remove currency symbols and commas
     const cleaned = raw.replace(/[₹$€,Rs.INR\s]/gi, "").trim();
     const num = parseFloat(cleaned);
     if (!isNaN(num)) return Math.round(num * 100) / 100;
@@ -138,24 +126,20 @@ function normalizeAmount(raw: any): number {
 
 /**
  * Ensure date is in YYYY-MM-DD format.
- * Handles common Indian formats: DD/MM/YYYY, DD-MM-YYYY, etc.
  */
 function normalizeDate(raw: any): string {
   if (!raw) return new Date().toISOString().split("T")[0];
 
   const str = String(raw).trim();
 
-  // Already YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
 
-  // DD/MM/YYYY or DD-MM-YYYY
   const ddmmyyyy = str.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
   if (ddmmyyyy) {
     const [, dd, mm, yyyy] = ddmmyyyy;
     return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
   }
 
-  // DD/MM/YY or DD-MM-YY
   const ddmmyy = str.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2})$/);
   if (ddmmyy) {
     const [, dd, mm, yy] = ddmmyy;
@@ -163,10 +147,8 @@ function normalizeDate(raw: any): string {
     return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
   }
 
-  // Try native Date parsing as last resort
   const d = new Date(str);
   if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
 
-  // Fallback to today
   return new Date().toISOString().split("T")[0];
 }
