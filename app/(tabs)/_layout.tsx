@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Activity, Compass, Home, User } from "lucide-react-native";
+import { Activity, Compass, Home, ScanLine, User } from "lucide-react-native";
 
 import { theme } from "@/constants/theme";
 
@@ -24,6 +24,13 @@ export default function TabsLayout() {
         options={{
           title: "Home",
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="scan"
+        options={{
+          title: "Scan",
+          tabBarIcon: ({ color, size }) => <ScanLine color={color} size={size} />,
         }}
       />
       <Tabs.Screen
