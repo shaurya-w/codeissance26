@@ -13,6 +13,7 @@ import { Bell, ScanLine } from "lucide-react-native";
 import { theme } from "@/constants/theme";
 import { supabase } from "@/lib/supabase";
 import { HamburgerMenu } from "@/components/HamburgerMenu";
+import { useOnboarding } from "@/context/OnboardingContext";
 
 type HeaderProps = {
   eyebrow?: string;
@@ -26,8 +27,22 @@ export function Header({ eyebrow, title, subtitle }: HeaderProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
+  const { signOut } = useOnboarding();
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number>(0);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      await signOut();
+      setMenuOpen(false);
+    } catch (err) {
+      console.error("Sign out failed:", err);
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
 
   useEffect(() => {
     fetchPendingCount();
@@ -112,6 +127,8 @@ export function Header({ eyebrow, title, subtitle }: HeaderProps) {
       <HamburgerMenu
         visible={menuOpen}
         onClose={() => setMenuOpen(false)}
+        onSignOut={handleSignOut}
+        isSigningOut={isSigningOut}
       />
     </>
   );
