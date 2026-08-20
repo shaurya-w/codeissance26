@@ -29,34 +29,35 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
         }}
       />
-      <Tabs.Screen
+      {/* <Tabs.Screen
         name="scan"
         options={{
           title: "Scan",
           tabBarIcon: ({ color, size }) => <ScanLine color={color} size={size} />,
         }}
-      />
+      /> */}
       <Tabs.Screen
-        name="explore"
+        name="tax"
         options={{
-          title: "Explore",
+          title: "Tax",
           tabBarIcon: ({ color, size }) => <Compass color={color} size={size} />,
         }}
       />
       <Tabs.Screen
-        name="activity"
+        name="advisory"
         options={{
-          title: "Activity",
-          tabBarIcon: ({ color, size }) => <Activity color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
+          title: "Advisory",
           tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
         }}
       />
+      <Tabs.Screen
+        name="expenses"
+        options={{
+          title: "Expenses",
+          tabBarIcon: ({ color, size }) => <Activity color={color} size={size} />,
+        }}
+      />
+      
     </Tabs>
   );
 }

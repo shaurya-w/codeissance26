@@ -208,6 +208,7 @@ export default function ScanScreen() {
           // Stay on the success screen shown by ReceiptEditForm
         }}
       />
+      
     </View>
   );
 }
