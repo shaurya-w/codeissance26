@@ -45,18 +45,26 @@ serve(async (req) => {
       Description: ${description || "N/A"}
       Date: ${date}
 
-      Map 'category' strictly to one of:
-      - personal transfers
-      - food and dining
-      - shopping
-      - travel and transport
-      - other
+      Map 'category' strictly to one of the following ALL CAPS enum options:
+      - PERSONAL_TRANSFERS
+      - FOOD_AND_DINING
+      - SHOPPING
+      - TRAVEL_AND_TRANSPORT
+      - UTILITIES_TELECOM
+      - PROFESSIONAL_SERVICES
+      - SOFTWARE_SUBSCRIPTIONS
+      - OFFICE_BUSINESS_SUPPLIES
+      - RENT_WORKSPACE
+      - EDUCATION_TRAINING
+      - MARKETING_ADVERTISING
+      - BANKING_FINANCIAL_CHARGES
+      - INSURANCE
+      - HEALTHCARE_MEDICAL
+      - OTHER
 
       Assess confidence_score from 0 to 100 based on vendor clarity and expense ambiguity.
     `;
 
-    // Correct @google/genai API: call generateContent directly off ai.models,
-    // pass generation config (responseMimeType/responseSchema) via `config`.
     const aiResult = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
@@ -68,15 +76,25 @@ serve(async (req) => {
             category: {
               type: Type.STRING,
               enum: [
-                "personal transfers",
-                "food and dining",
-                "shopping",
-                "travel and transport",
-                "other",
+                "PERSONAL_TRANSFERS",
+                "FOOD_AND_DINING",
+                "SHOPPING",
+                "TRAVEL_AND_TRANSPORT",
+                "UTILITIES_TELECOM",
+                "PROFESSIONAL_SERVICES",
+                "SOFTWARE_SUBSCRIPTIONS",
+                "OFFICE_BUSINESS_SUPPLIES",
+                "RENT_WORKSPACE",
+                "EDUCATION_TRAINING",
+                "MARKETING_ADVERTISING",
+                "BANKING_FINANCIAL_CHARGES",
+                "INSURANCE",
+                "HEALTHCARE_MEDICAL",
+                "OTHER",
               ],
             },
             is_tax_deductible: { type: Type.BOOLEAN },
-            confidence_score: { type: Type.INTEGER }, // 0 to 100
+            confidence_score: { type: Type.INTEGER },
             reasoning: { type: Type.STRING },
           },
           required: ["category", "is_tax_deductible", "confidence_score", "reasoning"],
@@ -84,7 +102,6 @@ serve(async (req) => {
       },
     });
 
-    // response.text is a property (getter), not a method, in @google/genai
     const rawText = aiResult.text;
     if (!rawText) {
       throw new Error("Gemini returned no text content in the response.");
@@ -94,7 +111,7 @@ serve(async (req) => {
     const { category, is_tax_deductible, confidence_score, reasoning } = classification;
     const currentTimestamp = new Date().toISOString();
 
-    // Database Routing Logic (Threshold <= 60)
+    // Routing Logic: Confidence <= 60 -> pending_actions
     if (confidence_score <= 60) {
       const { data, error } = await supabase.from("pending_actions").insert([
         {
@@ -130,15 +147,16 @@ serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } else {
+      // Confidence > 60 -> public.transactions
       const { data, error } = await supabase.from("transactions").insert([
         {
           user_id,
-          type: "EXPENSE", // Defaulted as requested
+          type: "EXPENSE",
           amount,
           date: new Date(date).toISOString(),
           category,
           is_tax_deductible,
-          source_type: "RECEIPT_OCR", // ENUM value matched
+          source_type: "RECEIPT_OCR",
           source_ref: vendor,
           tax_rule_applied: is_tax_deductible ? "Standard Business Expense Deduction" : null,
           created_at: currentTimestamp,
