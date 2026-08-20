@@ -9,6 +9,7 @@ export interface Bank {
    * if the image fails to load (offline, blocked domain, etc).
    */
   logoUri: string;
+  fallbackAsset?: any;
 }
 
 export type PlatformId = "swiggy" | "zomato" | "blinkit" | "fiverr" | "zepto" | "uber" | "ola";
@@ -17,7 +18,8 @@ export interface GigPlatform {
   id: PlatformId;
   /** Sent to the backend as `platform_name` — must match backend expectations exactly. */
   platformName: string;
-  logoUri: string;
+  logoUri?: string;
+  fallbackAsset?: any;
 }
 
 /** A single transaction row as returned by the setu-aa-ingestion function. */

@@ -9,37 +9,37 @@ export const GIG_PLATFORMS: GigPlatform[] = [
   {
     id: "swiggy",
     platformName: "Swiggy",
-    logoUri: "https://logo.clearbit.com/swiggy.com?size=128",
+    fallbackAsset: require("../assets/SWIGGY.jpeg"),
   },
   {
     id: "zomato",
     platformName: "Zomato",
-    logoUri: "https://logo.clearbit.com/zomato.com?size=128",
+    fallbackAsset: require("../assets/ZOMATO.jpeg"),
   },
   {
     id: "blinkit",
     platformName: "Blinkit",
-    logoUri: "https://logo.clearbit.com/blinkit.com?size=128",
+    fallbackAsset: require("../assets/BLINKIT.jpeg"),
   },
   {
     id: "fiverr",
     platformName: "Fiverr",
-    logoUri: "https://logo.clearbit.com/fiverr.com?size=128",
+    fallbackAsset: require("../assets/FIVERR.jpeg"),
   },
   {
     id: "zepto",
     platformName: "Zepto",
-    logoUri: "https://logo.clearbit.com/zepto.co?size=128",
+    fallbackAsset: require("../assets/ZEPTO.jpeg"),
   },
   {
     id: "uber",
     platformName: "Uber",
-    logoUri: "https://logo.clearbit.com/uber.com?size=128",
+    fallbackAsset: require("../assets/UBER.jpeg"),
   },
   {
     id: "ola",
     platformName: "Ola",
-    logoUri: "https://logo.clearbit.com/olacabs.com?size=128",
+    fallbackAsset: require("../assets/OLA.jpeg"),
   },
 ];
 

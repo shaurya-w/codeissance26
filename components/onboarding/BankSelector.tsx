@@ -19,6 +19,7 @@ export function BankSelector({ selectedBank, onSelect }: BankSelectorProps) {
           key={bank.id}
           label={bank.name}
           logoUri={bank.logoUri}
+          fallbackAsset={bank.fallbackAsset}
           fallbackInitial={bank.shortName.slice(0, 2)}
           selected={selectedBank === bank.id}
           onPress={() => onSelect(bank.id)}
