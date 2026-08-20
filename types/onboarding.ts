@@ -11,7 +11,7 @@ export interface Bank {
   logoUri: string;
 }
 
-export type PlatformId = "swiggy" | "zomato" | "blinkit" | "fiverr";
+export type PlatformId = "swiggy" | "zomato" | "blinkit" | "fiverr" | "zepto" | "uber" | "ola";
 
 export interface GigPlatform {
   id: PlatformId;
