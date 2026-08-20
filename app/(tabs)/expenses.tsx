@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Easing,
+  Image,
+  ImageSourcePropType,
   LayoutAnimation,
   Platform,
   Pressable,
@@ -21,6 +23,7 @@ import {
   ReceiptText,
   RefreshCw,
   ShieldCheck,
+  Trophy,
 } from "lucide-react-native";
 
 import { Header } from "@/components/Header";
@@ -36,8 +39,6 @@ if (
 }
 
 const MOCK_USER_ID = "97fc9b68-f8b6-497f-8dc4-a6829af235f7";
-
-const SCREEN_WIDTH = Dimensions.get("window").width;
 
 type TransactionType = "INCOME" | "EXPENSE";
 
@@ -81,6 +82,46 @@ type Transaction = {
   tax_rule_applied: string | null;
   created_at: string | null;
   tax_metadata: TaxMetadata | null;
+};
+
+// ---------------------------------------------------------------------------
+// Gig Platform Icons & Matcher Map
+// ---------------------------------------------------------------------------
+
+const PLATFORM_ICONS: Record<string, ImageSourcePropType> = {
+  SWIGGY: require("@/assets/SWIGGY.jpeg"),
+  ZOMATO: require("@/assets/ZOMATO.jpeg"),
+  UBER: require("@/assets/UBER.jpeg"),
+  OLA: require("@/assets/OLA.jpeg"),
+  BLINKIT: require("@/assets/BLINKIT.jpeg"),
+  ZEPTO: require("@/assets/ZEPTO.jpeg"),
+  FIVERR: require("@/assets/FIVERR.jpeg"),
+  HDFC: require("@/assets/HDFC.jpeg"),
+  ICICI: require("@/assets/ICICI.jpeg"),
+  SBI: require("@/assets/SBI.jpeg"),
+  AXIS: require("@/assets/AXIS.jpeg"),
+  BOB: require("@/assets/BOB.jpeg"),
+  OTHER: require("@/assets/OTHER.png")
+};
+
+// Returns matching asset icon key based on transaction text or source
+const identifyPlatform = (transaction: Transaction): string => {
+  const searchable = `${transaction.source_ref || ""} ${transaction.source_type || ""} ${transaction.tax_metadata?.source || ""}`.toUpperCase();
+
+  if (searchable.includes("SWIGGY")) return "SWIGGY";
+  if (searchable.includes("ZOMATO")) return "ZOMATO";
+  if (searchable.includes("UBER")) return "UBER";
+  if (searchable.includes("OLA")) return "OLA";
+  if (searchable.includes("BLINKIT")) return "BLINKIT";
+  if (searchable.includes("ZEPTO")) return "ZEPTO";
+  if (searchable.includes("FIVERR")) return "FIVERR";
+  if (searchable.includes("HDFC")) return "HDFC";
+  if (searchable.includes("ICICI")) return "ICICI";
+  if (searchable.includes("SBI")) return "SBI";
+  if (searchable.includes("AXIS")) return "AXIS";
+  if (searchable.includes("BOB")) return "BOB";
+
+  return "OTHER";
 };
 
 const CATEGORY_LABELS: Record<TransactionCategory, string> = {
@@ -444,7 +485,7 @@ function DonutLoader() {
 }
 
 // ---------------------------------------------------------------------------
-// Transaction Item Component (Supports Tax Deductible Expansion)
+// Single Transaction Item Component
 // ---------------------------------------------------------------------------
 
 function TransactionCardItem({ transaction }: { transaction: Transaction }) {
@@ -611,7 +652,92 @@ function TransactionCardItem({ transaction }: { transaction: Transaction }) {
 }
 
 // ---------------------------------------------------------------------------
-// Screen
+// Expandable Platform Accordion Component
+// ---------------------------------------------------------------------------
+
+type PlatformGroup = {
+  platformKey: string;
+  transactions: Transaction[];
+  income: number;
+  expenses: number;
+  netProfit: number;
+};
+
+function PlatformAccordionGroup({ group }: { group: PlatformGroup }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  const toggleGroup = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsOpen((prev) => !prev);
+
+    Animated.timing(rotateAnim, {
+      toValue: isOpen ? 0 : 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const chevronRotate = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "180deg"],
+  });
+
+  const iconSource = PLATFORM_ICONS[group.platformKey];
+
+  return (
+    <View style={styles.platformCardGroup}>
+      <Pressable onPress={toggleGroup} style={styles.platformHeader}>
+        <View style={styles.platformIconWrap}>
+          {iconSource ? (
+            <Image source={iconSource} style={styles.platformLogo} />
+          ) : (
+            <View style={styles.fallbackIcon}>
+              <Text style={styles.fallbackIconText}>
+                {group.platformKey.substring(0, 2)}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.platformMeta}>
+          <Text style={styles.platformTitle}>{group.platformKey}</Text>
+          <Text style={styles.platformSubtext}>
+            {group.transactions.length} transaction{group.transactions.length > 1 ? "s" : ""}
+          </Text>
+        </View>
+
+        <View style={styles.platformProfitCol}>
+          <Text
+            style={[
+              styles.platformProfitVal,
+              group.netProfit >= 0 ? styles.positiveNet : styles.negativeNet,
+            ]}
+          >
+            {group.netProfit >= 0 ? "+" : ""}
+            {formatCurrency(group.netProfit)}
+          </Text>
+          <Text style={styles.platformProfitLabel}>Net Earnings</Text>
+        </View>
+
+        <Animated.View style={{ transform: [{ rotate: chevronRotate }], marginLeft: 8 }}>
+          <ChevronDown size={18} color={theme.colors.mutedSage.muted1} />
+        </Animated.View>
+      </Pressable>
+
+      {isOpen && (
+        <View style={styles.platformBody}>
+          {group.transactions.map((t) => (
+            <TransactionCardItem key={t.id} transaction={t} />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Screen
 // ---------------------------------------------------------------------------
 
 export default function ExpensesScreen() {
@@ -708,6 +834,42 @@ export default function ExpensesScreen() {
     [filteredTransactions]
   );
 
+  // Group transactions by platform/gig source
+  const platformGroups = useMemo(() => {
+    const groups: Record<string, Transaction[]> = {};
+
+    filteredTransactions.forEach((t) => {
+      const platform = identifyPlatform(t);
+      if (!groups[platform]) groups[platform] = [];
+      groups[platform].push(t);
+    });
+
+    return Object.entries(groups).map(([platformKey, txList]) => {
+      let income = 0;
+      let expenses = 0;
+
+      txList.forEach((t) => {
+        if (t.type === "INCOME") income += Number(t.amount);
+        else expenses += Number(t.amount);
+      });
+
+      return {
+        platformKey,
+        transactions: txList,
+        income,
+        expenses,
+        netProfit: income - expenses,
+      };
+    }).sort((a, b) => b.netProfit - a.netProfit);
+  }, [filteredTransactions]);
+
+  // Identify highest profit platform
+  const maxProfitPlatform = useMemo(() => {
+    if (platformGroups.length === 0) return null;
+    const top = platformGroups[0];
+    return top.netProfit > 0 ? top : null;
+  }, [platformGroups]);
+
   const categoryTotals = useMemo(() => {
     const totals = new Map<TransactionCategory, number>();
 
@@ -772,6 +934,39 @@ export default function ExpensesScreen() {
           </View>
         ) : (
           <>
+            {/* Top Earner / Max Profit Banner */}
+            {maxProfitPlatform && (
+              <View style={styles.topPlatformCard}>
+                <View style={styles.topPlatformHeader}>
+                  <View style={styles.trophyIconWrap}>
+                    <Trophy size={16} color="#E5A93C" />
+                  </View>
+                  <Text style={styles.topPlatformBadge}>HIGHEST PROFIT PLATFORM</Text>
+                </View>
+
+                <View style={styles.topPlatformContent}>
+                  <View style={styles.topPlatformMeta}>
+                    {PLATFORM_ICONS[maxProfitPlatform.platformKey] ? (
+                      <Image
+                        source={PLATFORM_ICONS[maxProfitPlatform.platformKey]}
+                        style={styles.topPlatformLogo}
+                      />
+                    ) : null}
+                    <Text style={styles.topPlatformName}>
+                      {maxProfitPlatform.platformKey}
+                    </Text>
+                  </View>
+
+                  <View style={styles.topPlatformValCol}>
+                    <Text style={styles.topPlatformValue}>
+                      +{formatCurrency(maxProfitPlatform.netProfit)}
+                    </Text>
+                    <Text style={styles.topPlatformSub}>Net Income</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
             {/* Summary */}
             <View style={styles.summaryRow}>
               <View style={styles.summaryCard}>
@@ -821,13 +1016,13 @@ export default function ExpensesScreen() {
                   <ReceiptText size={34} color={theme.colors.mutedSage.muted1} />
                   <Text style={styles.emptyChartTitle}>No expenses yet</Text>
                   <Text style={styles.emptyChartText}>
-                    Expense categories will appear here once transactions are
-                    added.
+                    Expense categories will appear here once transactions are added.
                   </Text>
                 </View>
               )}
             </View>
 
+            {/* Filters */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -858,12 +1053,12 @@ export default function ExpensesScreen() {
               })}
             </ScrollView>
 
-            {/* Transactions */}
+            {/* Gig Platforms & Activity */}
             <View style={styles.transactionsSection}>
               <View style={styles.transactionsHeader}>
                 <View>
-                  <Text style={styles.sectionEyebrow}>ACTIVITY</Text>
-                  <Text style={styles.sectionTitle}>Transactions</Text>
+                  <Text style={styles.sectionEyebrow}>PLATFORMS & ACTIVITY</Text>
+                  <Text style={styles.sectionTitle}>Transactions by Platform</Text>
                 </View>
 
                 <Pressable
@@ -882,7 +1077,7 @@ export default function ExpensesScreen() {
                 </Pressable>
               </View>
 
-              {filteredTransactions.length === 0 ? (
+              {platformGroups.length === 0 ? (
                 <View style={styles.emptyTransactions}>
                   <ReceiptText size={34} color={theme.colors.mutedSage.muted1} />
                   <Text style={styles.emptyTransactionsTitle}>
@@ -893,11 +1088,11 @@ export default function ExpensesScreen() {
                   </Text>
                 </View>
               ) : (
-                <View style={styles.transactionList}>
-                  {filteredTransactions.map((transaction) => (
-                    <TransactionCardItem
-                      key={transaction.id}
-                      transaction={transaction}
+                <View style={styles.platformListContainer}>
+                  {platformGroups.map((group) => (
+                    <PlatformAccordionGroup
+                      key={group.platformKey}
+                      group={group}
                     />
                   ))}
                 </View>
@@ -969,6 +1164,68 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
+  // Top Platform Highlight Card
+  topPlatformCard: {
+    padding: theme.spacing.md,
+    borderRadius: 20,
+    backgroundColor: "#FEF8EC",
+    borderWidth: 1,
+    borderColor: "#F3E2C4",
+    marginBottom: theme.spacing.md,
+  },
+  topPlatformHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
+  },
+  trophyIconWrap: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#FFF2D6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  topPlatformBadge: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    color: "#B67B16",
+  },
+  topPlatformContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  topPlatformMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  topPlatformLogo: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+  },
+  topPlatformName: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: theme.colors.ink,
+  },
+  topPlatformValCol: {
+    alignItems: "flex-end",
+  },
+  topPlatformValue: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#2FAE60",
+  },
+  topPlatformSub: {
+    fontSize: 10,
+    color: theme.colors.mutedSage.muted1,
+  },
+
   // Filters
   filterRow: {
     gap: theme.spacing.xs,
@@ -1007,7 +1264,7 @@ const styles = StyleSheet.create({
 
   summaryCard: {
     flex: 1,
-    minHeight: 128,
+    minHeight: 110,
     padding: theme.spacing.md,
     borderRadius: 22,
     backgroundColor: theme.colors.pageBg,
@@ -1022,7 +1279,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 17,
     backgroundColor: theme.colors.onboarding.feedback.errorBackground,
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
   },
 
   summaryIconIncome: {
@@ -1032,7 +1289,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 17,
     backgroundColor: theme.colors.border,
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
   },
 
   summaryLabel: {
@@ -1102,11 +1359,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     alignSelf: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 18,
-    elevation: 8,
   },
 
   donutCenter: {
@@ -1116,109 +1368,187 @@ const styles = StyleSheet.create({
   },
 
   donutCenterLabel: {
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 11,
     color: theme.colors.mutedSage.muted1,
+    fontWeight: "600",
   },
 
   donutCenterValue: {
-    marginTop: 4,
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "900",
     color: theme.colors.ink,
-    letterSpacing: -0.5,
+    marginTop: 2,
   },
 
   legendWrap: {
-    marginTop: theme.spacing.lg,
-    width: "100%",
-    paddingHorizontal: theme.spacing.md,
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: theme.spacing.sm,
+    justifyContent: "center",
+    gap: 12,
+    marginTop: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
   },
 
   legendItem: {
     flexDirection: "row",
     alignItems: "center",
-    width: "47%",
     gap: 6,
   },
 
   legendDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
 
   legendLabel: {
-    flex: 1,
-    fontSize: 11,
-    fontWeight: "700",
+    fontSize: 12,
+    fontWeight: "600",
     color: theme.colors.ink,
   },
 
   legendPct: {
-    fontSize: 10,
-    fontWeight: "800",
+    fontSize: 11,
     color: theme.colors.mutedSage.muted1,
   },
 
   emptyChart: {
-    minHeight: 220,
+    padding: theme.spacing.lg,
     alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: theme.spacing.lg,
   },
 
   emptyChartTitle: {
-    marginTop: theme.spacing.sm,
-    fontSize: theme.fontSize.md,
-    fontWeight: "900",
+    marginTop: 8,
+    fontSize: 14,
+    fontWeight: "800",
     color: theme.colors.ink,
   },
 
   emptyChartText: {
     marginTop: 4,
     fontSize: 12,
-    lineHeight: 18,
-    textAlign: "center",
     color: theme.colors.mutedSage.muted1,
+    textAlign: "center",
   },
 
+  // Platform Accordion Section
   transactionsSection: {
     marginTop: theme.spacing.xs,
   },
 
   transactionsHeader: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: theme.spacing.sm,
+    alignItems: "center",
+    marginBottom: theme.spacing.md,
   },
 
   refreshButton: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-
-  refreshButtonPressed: {
+    padding: 8,
+    borderRadius: 999,
     backgroundColor: theme.colors.border,
   },
 
-  emptyTransactions: {
-    padding: theme.spacing.xl,
+  refreshButtonPressed: {
+    opacity: 0.7,
+  },
+
+  platformListContainer: {
+    gap: theme.spacing.sm,
+  },
+
+  platformCardGroup: {
+    borderRadius: 18,
+    backgroundColor: theme.colors.pageBg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    overflow: "hidden",
+  },
+
+  platformHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: theme.spacing.md,
+  },
+
+  platformIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    overflow: "hidden",
+    marginRight: 12,
+  },
+
+  platformLogo: {
+    width: "100%",
+    height: "100%",
+  },
+
+  fallbackIcon: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: theme.colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
 
+  fallbackIconText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: theme.colors.ink,
+  },
+
+  platformMeta: {
+    flex: 1,
+  },
+
+  platformTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: theme.colors.ink,
+  },
+
+  platformSubtext: {
+    fontSize: 11,
+    color: theme.colors.mutedSage.muted1,
+    marginTop: 2,
+  },
+
+  platformProfitCol: {
+    alignItems: "flex-end",
+  },
+
+  platformProfitVal: {
+    fontSize: 14,
+    fontWeight: "900",
+  },
+
+  platformProfitLabel: {
+    fontSize: 10,
+    color: theme.colors.mutedSage.muted1,
+  },
+
+  positiveNet: {
+    color: "#2FAE60",
+  },
+
+  negativeNet: {
+    color: theme.colors.onboarding.feedback.errorText,
+  },
+
+  platformBody: {
+    paddingHorizontal: theme.spacing.xs,
+    paddingBottom: theme.spacing.xs,
+    gap: 8,
+  },
+
+  emptyTransactions: {
+    padding: theme.spacing.lg,
+    alignItems: "center",
+  },
+
   emptyTransactionsTitle: {
-    marginTop: theme.spacing.xs,
+    marginTop: 8,
     fontSize: 14,
     fontWeight: "800",
     color: theme.colors.ink,
@@ -1231,29 +1561,25 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  transactionList: {
-    gap: theme.spacing.xs,
-  },
-
+  // Transaction Cards
   transactionCard: {
     padding: theme.spacing.sm,
-    borderRadius: 20,
-    backgroundColor: theme.colors.pageBg,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    backgroundColor: theme.colors.pageBg,
   },
 
   transactionCardDeductible: {
-    borderColor: "rgba(47, 174, 96, 0.25)",
+    borderColor: "#2FAE6033",
   },
 
   transactionCardExpanded: {
-    backgroundColor: theme.colors.pageBg,
-    borderColor: "#2FAE60",
+    backgroundColor: "#F8FAF8",
   },
 
   transactionCardPressed: {
-    opacity: 0.9,
+    opacity: 0.8,
   },
 
   transactionHeaderRow: {
@@ -1262,11 +1588,12 @@ const styles = StyleSheet.create({
   },
 
   transactionIcon: {
-    width: 42,
-    height: 42,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 21,
+    marginRight: 10,
   },
 
   expenseIcon: {
@@ -1279,8 +1606,6 @@ const styles = StyleSheet.create({
 
   transactionMain: {
     flex: 1,
-    minWidth: 0,
-    marginLeft: theme.spacing.sm,
   },
 
   transactionTitle: {
@@ -1290,31 +1615,30 @@ const styles = StyleSheet.create({
   },
 
   transactionMetaRow: {
-    marginTop: 6,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
+    marginTop: 2,
   },
 
   categoryBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-    maxWidth: "62%",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    gap: 4,
   },
 
   categoryBadgeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
   },
 
   categoryBadgeText: {
-    fontSize: 9.5,
-    fontWeight: "800",
+    fontSize: 9,
+    fontWeight: "700",
   },
 
   transactionMeta: {
@@ -1324,7 +1648,6 @@ const styles = StyleSheet.create({
 
   transactionAmountContainer: {
     alignItems: "flex-end",
-    marginLeft: theme.spacing.xs,
   },
 
   transactionAmount: {
@@ -1341,52 +1664,51 @@ const styles = StyleSheet.create({
   },
 
   taxBadgeContainer: {
-    marginTop: 4,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    marginTop: 2,
   },
 
   taxPill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(47, 174, 96, 0.12)",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    backgroundColor: "#2FAE6015",
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
   },
 
   taxPillIcon: {
-    marginRight: 3,
+    marginRight: 2,
   },
 
   taxLabel: {
-    fontSize: 9.5,
+    fontSize: 8,
     fontWeight: "800",
     color: "#2FAE60",
   },
 
-  // Explanation Box Styling
   explanationCard: {
-    marginTop: theme.spacing.sm,
-    padding: theme.spacing.sm,
-    borderRadius: 14,
-    backgroundColor: "rgba(47, 174, 96, 0.05)",
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: "#F2F9F4",
     borderWidth: 1,
-    borderColor: "rgba(47, 174, 96, 0.18)",
+    borderColor: "#2FAE6022",
   },
 
   explanationHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 4,
   },
 
   explanationTitleRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 4,
   },
 
   explanationTitle: {
@@ -1396,42 +1718,37 @@ const styles = StyleSheet.create({
   },
 
   ruleBadge: {
-    backgroundColor: "#2FAE60",
+    backgroundColor: "#2FAE6022",
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
   },
 
   ruleBadgeText: {
-    fontSize: 8.5,
-    fontWeight: "900",
-    color: "#FFFFFF",
+    fontSize: 8,
+    fontWeight: "800",
+    color: "#2FAE60",
   },
 
   explanationText: {
-    fontSize: 11.5,
-    lineHeight: 16,
-    fontWeight: "500",
+    fontSize: 11,
     color: theme.colors.ink,
+    lineHeight: 15,
   },
 
   metadataFooterRow: {
-    marginTop: 8,
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(47, 174, 96, 0.12)",
     flexDirection: "row",
-    gap: 12,
+    gap: 10,
+    marginTop: 6,
   },
 
   metadataFooterTag: {
-    fontSize: 9.5,
+    fontSize: 9,
     color: theme.colors.mutedSage.muted1,
-    fontWeight: "600",
   },
 
   metadataFooterValue: {
-    fontWeight: "800",
+    fontWeight: "700",
     color: theme.colors.ink,
   },
 });
