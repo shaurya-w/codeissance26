@@ -138,17 +138,19 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   }, [isSubmittingStep0, persist, state]);
 
   const submitStep1 = useCallback(async (): Promise<boolean> => {
-    if (selectedPlatforms.length === 0 || isSubmittingStep1) return false;
+    if (!selectedBank || isSubmittingStep1) return false;
 
     setIsSubmittingStep1(true);
     setStep1Error(null);
     try {
-      const results = await submitGigPayouts(selectedPlatforms);
+      // Simulate random wait time between 5s and 10s
+      const delayMs = Math.floor(Math.random() * 5001) + 5000;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+
       await persist({
         ...state,
         currentStep: 2,
-        selectedPlatforms,
-        gigPayoutResults: results,
+        selectedBank,
       });
       return true;
     } catch (err) {
@@ -157,20 +159,22 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     } finally {
       setIsSubmittingStep1(false);
     }
-  }, [selectedPlatforms, isSubmittingStep1, persist, state]);
+  }, [selectedBank, isSubmittingStep1, persist, state]);
 
   const submitStep2 = useCallback(async (): Promise<boolean> => {
-    if (!selectedBank || isSubmittingStep2) return false;
+    if (selectedPlatforms.length === 0 || isSubmittingStep2) return false;
 
     setIsSubmittingStep2(true);
     setStep2Error(null);
     try {
-      const result = await submitBankFeed();
+      // Simulate random wait time between 5s and 10s
+      const delayMs = Math.floor(Math.random() * 5001) + 5000;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+
       await persist({
         ...state,
         currentStep: 2,
-        selectedBank,
-        bankFeedResult: result,
+        selectedPlatforms,
         onboardingCompleted: true,
       });
       return true;
@@ -180,7 +184,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     } finally {
       setIsSubmittingStep2(false);
     }
-  }, [selectedBank, isSubmittingStep2, persist, state]);
+  }, [selectedPlatforms, isSubmittingStep2, persist, state]);
 
   const signOut = useCallback(async () => {
     await clearOnboardingState();

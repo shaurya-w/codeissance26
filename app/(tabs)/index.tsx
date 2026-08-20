@@ -1,11 +1,16 @@
-import React, { useEffect, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { LineChart } from "react-native-chart-kit";
 
 import { Header } from "@/components/Header";
 import { TaxDeadlineBanner } from "@/components/TaxDeadlineBanner";
@@ -62,13 +67,143 @@ const parseRagContext = (rawContext: any) => {
   return context;
 };
 
+const screenWidth = Dimensions.get("window").width;
+
+type FilterKey = "15d" | "30d" | "month" | "3m" | "all";
+
+const FILTER_OPTIONS: { key: FilterKey; label: string }[] = [
+  { key: "15d", label: "15 Days" },
+  { key: "30d", label: "30 Days" },
+  { key: "month", label: "This Month" },
+  { key: "3m", label: "3 Months" },
+  { key: "all", label: "All Time" },
+];
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
 export default function HomeScreen() {
+  const router = useRouter();
   const [estimate, setEstimate] = useState<TaxEstimate | null>(null);
+  const [totalIncome, setTotalIncome] = useState<number>(0);
+  const [totalExpense, setTotalExpense] = useState<number>(0);
+  const [chartLabels, setChartLabels] = useState<string[]>(["No Data"]);
+  const [incomeData, setIncomeData] = useState<number[]>([0]);
+  const [expenseData, setExpenseData] = useState<number[]>([0]);
+  const [selectedFilter, setSelectedFilter] = useState<FilterKey>("30d");
   const [loading, setLoading] = useState<boolean>(true);
 
-  useEffect(() => {
-    fetchLatestTaxEstimate();
-  }, []);
+  const getYearMonthKey = (dateString: string): string => {
+    if (!dateString) return "";
+    const parts = dateString.split("-");
+    if (parts.length >= 2) {
+      return `${parts[0]}-${parts[1]}`; // e.g. "2026-06"
+    }
+    return "";
+  };
+
+  const getFriendlyMonthName = (yearMonthKey: string): string => {
+    if (!yearMonthKey) return "";
+    const [_, monthStr] = yearMonthKey.split("-");
+    const m = parseInt(monthStr, 10);
+    if (m >= 1 && m <= 12) {
+      return MONTH_NAMES[m - 1];
+    }
+    return yearMonthKey;
+  };
+
+  const fetchTransactionsSummary = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("type, amount, date")
+        .eq("user_id", DEFAULT_USER_ID);
+
+      if (!error && data) {
+        let incomeSum = 0;
+        let expenseSum = 0;
+
+        const monthlyIncomeMap: Record<string, number> = {};
+        const monthlyExpenseMap: Record<string, number> = {};
+        const uniqueMonthsSet = new Set<string>();
+
+        const now = new Date();
+
+        data.forEach((t) => {
+          if (!t.date) return;
+          const tDate = new Date(t.date);
+
+          // Apply date filter
+          if (selectedFilter !== "all") {
+            if (selectedFilter === "month") {
+              const dateParts = t.date.split("-");
+              const tYear = parseInt(dateParts[0], 10);
+              const tMonth = parseInt(dateParts[1], 10);
+              const isCurrentMonth = tYear === now.getFullYear() && tMonth === (now.getMonth() + 1);
+              if (!isCurrentMonth) return;
+            } else {
+              const daysMap: Record<string, number> = {
+                "15d": 15,
+                "30d": 30,
+                "3m": 90,
+              };
+              const days = daysMap[selectedFilter];
+              const cutoff = new Date(now);
+              cutoff.setDate(cutoff.getDate() - days);
+              if (tDate < cutoff) return;
+            }
+          }
+
+          const val = parseFloat(String(t.amount || 0));
+          if (t.type === "INCOME") {
+            incomeSum += val;
+          } else if (t.type === "EXPENSE") {
+            expenseSum += val;
+          }
+
+          const key = getYearMonthKey(t.date);
+          if (key) {
+            uniqueMonthsSet.add(key);
+            if (t.type === "INCOME") {
+              monthlyIncomeMap[key] = (monthlyIncomeMap[key] || 0) + val;
+            } else if (t.type === "EXPENSE") {
+              monthlyExpenseMap[key] = (monthlyExpenseMap[key] || 0) + val;
+            }
+          }
+        });
+
+        setTotalIncome(incomeSum);
+        setTotalExpense(expenseSum);
+
+        const sortedMonthKeys = Array.from(uniqueMonthsSet).sort();
+
+        if (sortedMonthKeys.length > 0) {
+          const labels = sortedMonthKeys.map(getFriendlyMonthName);
+          const incomes = sortedMonthKeys.map((key) => monthlyIncomeMap[key] || 0);
+          const expenses = sortedMonthKeys.map((key) => monthlyExpenseMap[key] || 0);
+
+          setChartLabels(labels);
+          setIncomeData(incomes);
+          setExpenseData(expenses);
+        } else {
+          setChartLabels(["No Data"]);
+          setIncomeData([0]);
+          setExpenseData([0]);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load transactions summary:", err);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchLatestTaxEstimate();
+      fetchTransactionsSummary();
+    }, [selectedFilter])
+  );
 
   const fetchLatestTaxEstimate = async () => {
     setLoading(true);
@@ -119,6 +254,10 @@ export default function HomeScreen() {
         eyebrow="Financial Intelligence"
         title="Dashboard"
         subtitle="Tax estimates & real-time liabilities"
+        onMenuClose={() => {
+          fetchLatestTaxEstimate();
+          fetchTransactionsSummary();
+        }}
       />
       <ScrollView
         style={styles.scroll}
@@ -131,10 +270,136 @@ export default function HomeScreen() {
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color={theme.colors.brandGreen} />
           </View>
-        ) : estimate ? (
+        ) : (
           <>
-            {/* Visual Tax Metric Bar Chart */}
+            {/* Time Filter ScrollView */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterRow}
+            >
+              {FILTER_OPTIONS.map((option) => {
+                const isActive = option.key === selectedFilter;
+                return (
+                  <Pressable
+                    key={option.key}
+                    onPress={() => setSelectedFilter(option.key)}
+                    style={[
+                      styles.filterPill,
+                      isActive && styles.filterPillActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.filterText,
+                        isActive && styles.filterTextActive,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            {/* Income Card (Line Chart) */}
             <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.eyebrow}>TOTAL INCOME</Text>
+                <Text style={[styles.amount, { color: theme.colors.brandGreen }]}>
+                  {formatCurrency(totalIncome)}
+                </Text>
+              </View>
+              <LineChart
+                data={{
+                  labels: chartLabels,
+                  datasets: [{ data: incomeData }],
+                }}
+                width={screenWidth - 64}
+                height={160}
+                yAxisLabel="₹"
+                yAxisSuffix=""
+                chartConfig={{
+                  backgroundGradientFrom: theme.colors.surface,
+                  backgroundGradientTo: theme.colors.surface,
+                  decimalPlaces: 0,
+                  color: (opacity = 1) => `rgba(91, 154, 111, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(23, 59, 43, ${opacity})`,
+                  fillShadowGradient: theme.colors.brandGreen,
+                  fillShadowGradientOpacity: 0.1,
+                  propsForLabels: {
+                    fontSize: 10,
+                    fontWeight: "bold",
+                  },
+                }}
+                verticalLabelRotation={0}
+                fromZero
+                bezier
+                withOuterLines={false}
+                style={styles.chart}
+              />
+              <Pressable
+                onPress={() => router.push("/expenses")}
+                style={({ pressed }) => [
+                  styles.linkButton,
+                  pressed && styles.linkButtonPressed,
+                ]}
+              >
+                <Text style={styles.linkText}>View Detailed Income</Text>
+              </Pressable>
+            </View>
+
+            {/* Expense Card (Line Chart) */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.eyebrow}>TOTAL EXPENSES</Text>
+                <Text style={[styles.amount, { color: "#985743" }]}>
+                  {formatCurrency(totalExpense)}
+                </Text>
+              </View>
+              <LineChart
+                data={{
+                  labels: chartLabels,
+                  datasets: [{ data: expenseData }],
+                }}
+                width={screenWidth - 64}
+                height={160}
+                yAxisLabel="₹"
+                yAxisSuffix=""
+                chartConfig={{
+                  backgroundGradientFrom: theme.colors.surface,
+                  backgroundGradientTo: theme.colors.surface,
+                  decimalPlaces: 0,
+                  color: (opacity = 1) => `rgba(152, 87, 67, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(23, 59, 43, ${opacity})`,
+                  fillShadowGradient: "#985743",
+                  fillShadowGradientOpacity: 0.1,
+                  propsForLabels: {
+                    fontSize: 10,
+                    fontWeight: "bold",
+                  },
+                }}
+                verticalLabelRotation={0}
+                fromZero
+                bezier
+                withOuterLines={false}
+                style={styles.chart}
+              />
+              <Pressable
+                onPress={() => router.push("/expenses")}
+                style={({ pressed }) => [
+                  styles.linkButton,
+                  pressed && styles.linkButtonPressed,
+                ]}
+              >
+                <Text style={styles.linkText}>View Detailed Expenses</Text>
+              </Pressable>
+            </View>
+
+            {estimate ? (
+              <>
+                {/* Visual Tax Metric Bar Chart */}
+                <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <Text style={styles.eyebrow}>TAX METRICS SUMMARY</Text>
                 <Text style={styles.dateLabel}>
@@ -258,6 +523,8 @@ export default function HomeScreen() {
             </View>
           </>
         ) : null}
+      </>
+    )}
       </ScrollView>
     </View>
   );
@@ -416,5 +683,55 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.xs,
     color: theme.colors.mutedSage.muted1,
     lineHeight: 16,
+  },
+  amount: {
+    fontSize: theme.fontSize.lg,
+    fontWeight: theme.typography.fontWeights.bold,
+    fontFamily: theme.typography.fontMono,
+  },
+  chart: {
+    marginVertical: theme.spacing.sm,
+    borderRadius: theme.radius.sm,
+    alignSelf: "center",
+    paddingBottom: theme.spacing.xs,
+  },
+  linkButton: {
+    marginTop: theme.spacing.xs,
+    paddingTop: theme.spacing.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.borderLight,
+  },
+  linkButtonPressed: {
+    opacity: 0.75,
+  },
+  linkText: {
+    fontSize: theme.fontSize.xs,
+    fontWeight: theme.typography.fontWeights.bold,
+    color: theme.colors.brandGreen,
+  },
+  filterRow: {
+    flexDirection: "row",
+    gap: theme.spacing.xs,
+    paddingBottom: theme.spacing.md,
+  },
+  filterPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: theme.colors.pageBg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  filterPillActive: {
+    backgroundColor: theme.colors.ink,
+    borderColor: theme.colors.ink,
+  },
+  filterText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: theme.colors.mutedSage.muted1,
+  },
+  filterTextActive: {
+    color: theme.colors.pageBg,
   },
 });

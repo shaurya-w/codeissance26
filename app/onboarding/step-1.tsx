@@ -4,12 +4,12 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { OnboardingFooter } from "@/components/onboarding/OnboardingFooter";
 import { OnboardingLayout } from "@/components/onboarding/OnboardingLayout";
-import { PlatformSelector } from "@/components/onboarding/PlatformSelector";
+import { BankSelector } from "@/components/onboarding/BankSelector";
 import { theme } from "@/constants/theme";
 import { useOnboarding } from "@/context/OnboardingContext";
 
 export default function OnboardingStep1Screen() {
-  const { selectedPlatforms, togglePlatform, isSubmittingStep1, step1Error, submitStep1 } =
+  const { selectedBank, setSelectedBank, isSubmittingStep1, step1Error, submitStep1 } =
     useOnboarding();
 
   const handleContinue = async () => {
@@ -22,28 +22,28 @@ export default function OnboardingStep1Screen() {
   return (
     <OnboardingLayout
       step={1}
-      eyebrow="Getting set up"
+      eyebrow="Link your bank"
       title="Onboarding"
-      subtitle="Tell us which gig platforms you work with."
+      subtitle="Connect your bank so we can track income and expenses automatically."
       footer={
         <OnboardingFooter
           ctaLabel="Continue"
           onPress={handleContinue}
-          disabled={selectedPlatforms.length === 0}
+          disabled={!selectedBank}
           loading={isSubmittingStep1}
           error={step1Error}
         />
       }
     >
       <View style={styles.intro}>
-        <Text style={styles.headline}>Your platforms</Text>
+        <Text style={styles.headline}>Link your bank</Text>
         <Text style={styles.subtext}>
-          Pick every platform you earn from. You can select more than one — we'll pull in payout
-          data for each.
+          Choose the bank your gig income lands in. This lets us surface your real cash flow —
+          nothing is shared beyond what's needed to categorize transactions.
         </Text>
       </View>
 
-      <PlatformSelector selectedPlatforms={selectedPlatforms} onToggle={togglePlatform} />
+      <BankSelector selectedBank={selectedBank} onSelect={setSelectedBank} />
     </OnboardingLayout>
   );
 }

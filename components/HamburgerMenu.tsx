@@ -14,6 +14,11 @@ import { ChevronDown, LogOut, X } from "lucide-react-native";
 
 import { theme } from "@/constants/theme";
 import { supabase } from "@/lib/supabase";
+import { fetchFromFastAPI } from "@/lib/api";
+
+const formatCurrency = (amount: number) => {
+  return `₹${amount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+};
 
 export type PendingAction = {
   id: string;
@@ -38,8 +43,15 @@ const CATEGORIES = [
   "FOOD_AND_DINING",
   "SHOPPING",
   "TRAVEL_AND_TRANSPORT",
+  "UTILITIES_TELECOM",
+  "PROFESSIONAL_SERVICES",
+  "SOFTWARE_SUBSCRIPTIONS",
+  "OFFICE_BUSINESS_SUPPLIES",
+  "RENT_WORKSPACE",
   "EDUCATION_TRAINING",
+  "MARKETING_ADVERTISING",
   "BANKING_FINANCIAL_CHARGES",
+  "INSURANCE",
   "HEALTHCARE_MEDICAL",
   "OTHER",
 ];
@@ -56,8 +68,7 @@ export function HamburgerMenu({
   const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
   const [loadingActions, setLoadingActions] = useState<boolean>(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
-
-  // Dropdown Modal state
+  const [selectedCategoryMap, setSelectedCategoryMap] = useState<Record<string, string>>({});
   const [activeActionId, setActiveActionId] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
 
@@ -89,38 +100,98 @@ export function HamburgerMenu({
     }
   };
 
-  const handleSelectCategory = async (category: string) => {
-    if (!activeActionId) return;
-
-    const actionId = activeActionId;
-    setIsDropdownOpen(false);
-    setActiveActionId(null);
+  const handleApprove = async (actionId: string) => {
     setActionLoadingId(actionId);
-
-    const targetAction = pendingActions.find((a) => a.id === actionId);
-    const updatedPayload = {
-      ...(targetAction?.proposed_payload || {}),
-      category,
-      selected_category: category,
-    };
-
     try {
-      const { error } = await supabase
+      // Try /api/pending-actions/{id}/approve first, fallback to /pending-actions/{id}/approve
+      try {
+        await fetchFromFastAPI(`/api/pending-actions/${actionId}/approve`, {
+          method: "POST",
+        });
+      } catch (err) {
+        console.log("Failed with /api prefix, trying without prefix...", err);
+        await fetchFromFastAPI(`/pending-actions/${actionId}/approve`, {
+          method: "POST",
+        });
+      }
+
+      setPendingActions((prev) => prev.filter((item) => item.id !== actionId));
+      Alert.alert("Success", "Action approved successfully.");
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Failed to approve action.");
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleReject = async (actionId: string) => {
+    setActionLoadingId(actionId);
+    try {
+      // Try POST /api/pending-actions/{id}/reject (with prefix fallback) first, fallback to Supabase update
+      try {
+        try {
+          await fetchFromFastAPI(`/api/pending-actions/${actionId}/reject`, {
+            method: "POST",
+          });
+        } catch {
+          await fetchFromFastAPI(`/pending-actions/${actionId}/reject`, {
+            method: "POST",
+          });
+        }
+      } catch (err) {
+        console.log("Failed to reject via backend endpoint, updating Supabase directly...", err);
+        const { error } = await supabase
+          .from("pending_actions")
+          .update({ status: "REJECTED" })
+          .eq("id", actionId);
+        if (error) throw error;
+      }
+
+      setPendingActions((prev) => prev.filter((item) => item.id !== actionId));
+      Alert.alert("Success", "Action rejected successfully.");
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Failed to reject action.");
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleClassifyAndSubmit = async (actionId: string, category: string) => {
+    setActionLoadingId(actionId);
+    try {
+      const targetAction = pendingActions.find((a) => a.id === actionId);
+      const updatedPayload = {
+        ...(targetAction?.proposed_payload || {}),
+        category,
+        selected_category: category,
+      };
+
+      // 1. Update proposed_payload in Supabase first
+      const { error: dbError } = await supabase
         .from("pending_actions")
         .update({
-          status: "APPROVED",
           proposed_payload: updatedPayload,
         })
         .eq("id", actionId);
 
-      if (error) {
-        Alert.alert("Error", "Failed to resolve action category.");
-      } else {
-        setPendingActions((prev) => prev.filter((item) => item.id !== actionId));
-        onClose(); // Close menu after selection
+      if (dbError) throw dbError;
+
+      // 2. Trigger backend approve endpoint to execute approval transactions
+      try {
+        await fetchFromFastAPI(`/api/pending-actions/${actionId}/approve`, {
+          method: "POST",
+        });
+      } catch (err) {
+        console.log("Failed with /api prefix, trying without prefix...", err);
+        await fetchFromFastAPI(`/pending-actions/${actionId}/approve`, {
+          method: "POST",
+        });
       }
+
+      setPendingActions((prev) => prev.filter((item) => item.id !== actionId));
+      Alert.alert("Success", "Transaction classified and approved successfully.");
     } catch (err: any) {
-      Alert.alert("Error", err.message || "An unexpected error occurred.");
+      Alert.alert("Error", err.message || "Failed to submit classification.");
     } finally {
       setActionLoadingId(null);
     }
@@ -185,40 +256,122 @@ export function HamburgerMenu({
           ) : pendingActions.length === 0 ? (
             <Text style={styles.emptyText}>No pending actions required.</Text>
           ) : (
-            pendingActions.map((action) => (
-              <View key={action.id} style={styles.actionCard}>
-                <View style={styles.actionHeader}>
-                  <Text style={styles.agentBadge}>{action.agent_name}</Text>
-                  <Text style={styles.actionType}>{action.action_type}</Text>
-                </View>
+            pendingActions.map((action) => {
+              const title =
+                action.action_type === "RECONCILE_PAYOUT"
+                  ? "Platform Payout Alert"
+                  : action.action_type === "ADD_TRANSACTION"
+                  ? "New Expense Detected"
+                  : action.action_type === "UPDATE_TAX_ESTIMATE"
+                  ? "Tax Estimate Update"
+                  : action.action_type === "CLASSIFY_TRANSACTION"
+                  ? "Classify Transaction"
+                  : action.action_type.replace(/_/g, " ");
 
-                <Text style={styles.actionReasoning}>
-                  {action.agent_reasoning}
-                </Text>
+              const proposed = action.proposed_payload || {};
+              const financialImpact = proposed.financial_impact || {};
+              const taxSetAside = parseFloat(
+                String(financialImpact.recommended_tax_set_aside || 0)
+              );
 
-                <View style={styles.cardActions}>
-                  {actionLoadingId === action.id ? (
-                    <ActivityIndicator size="small" color={theme.colors.ink} />
-                  ) : (
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.dropdownTrigger,
-                        pressed && styles.btnPressed,
-                      ]}
-                      onPress={() => {
-                        setActiveActionId(action.id);
-                        setIsDropdownOpen(true);
-                      }}
-                    >
-                      <Text style={styles.dropdownTriggerText}>
-                        Select Correct Category
+              const isClassify = action.action_type === "CLASSIFY_TRANSACTION";
+
+              return (
+                <View key={action.id} style={styles.actionCard}>
+                  {/* Header */}
+                  <View style={styles.actionHeader}>
+                    <Text style={styles.actionTitle} numberOfLines={1}>
+                      {title}
+                    </Text>
+                    <Text style={styles.agentBadge}>{action.agent_name}</Text>
+                  </View>
+
+                  {/* Message */}
+                  <Text style={styles.actionReasoning}>
+                    {action.agent_reasoning}
+                  </Text>
+
+                  {/* Tax Tag */}
+                  {taxSetAside > 0 && (
+                    <View style={styles.taxTag}>
+                      <Text style={styles.taxTagText}>
+                        🔔 AI Recommends: Reserve {formatCurrency(taxSetAside)} for Taxes
                       </Text>
-                      <ChevronDown size={18} color={theme.colors.ink} />
-                    </Pressable>
+                    </View>
                   )}
+
+                  {/* Action Buttons */}
+                  <View style={styles.cardActions}>
+                    {actionLoadingId === action.id ? (
+                      <ActivityIndicator size="small" color={theme.colors.brandGreen} />
+                    ) : isClassify ? (
+                      <View style={{ width: "100%", gap: theme.spacing.xs }}>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.dropdownTrigger,
+                            pressed && styles.btnPressed,
+                          ]}
+                          onPress={() => {
+                            setActiveActionId(action.id);
+                            setIsDropdownOpen(true);
+                          }}
+                        >
+                          <Text style={styles.dropdownTriggerText} numberOfLines={1}>
+                            {selectedCategoryMap[action.id]
+                              ? selectedCategoryMap[action.id].replace(/_/g, " ")
+                              : "Select Category"}
+                          </Text>
+                          <ChevronDown size={18} color={theme.colors.ink} />
+                        </Pressable>
+
+                        <Pressable
+                          disabled={!selectedCategoryMap[action.id]}
+                          style={({ pressed }) => [
+                            styles.submitBtn,
+                            !selectedCategoryMap[action.id] && styles.submitBtnDisabled,
+                            pressed && selectedCategoryMap[action.id] && styles.btnPressed,
+                          ]}
+                          onPress={() =>
+                            handleClassifyAndSubmit(action.id, selectedCategoryMap[action.id])
+                          }
+                        >
+                          <Text
+                            style={[
+                              styles.submitBtnText,
+                              !selectedCategoryMap[action.id] && styles.submitBtnTextDisabled,
+                            ]}
+                          >
+                            Submit Classification
+                          </Text>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <View style={styles.actionButtonsRow}>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.approveBtnHalf,
+                            pressed && styles.btnPressed,
+                          ]}
+                          onPress={() => handleApprove(action.id)}
+                        >
+                          <Text style={styles.approveBtnText}>Approve</Text>
+                        </Pressable>
+
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.rejectBtnHalf,
+                            pressed && styles.btnPressed,
+                          ]}
+                          onPress={() => handleReject(action.id)}
+                        >
+                          <Text style={styles.rejectBtnText}>Reject</Text>
+                        </Pressable>
+                      </View>
+                    )}
+                  </View>
                 </View>
-              </View>
-            ))
+              );
+            })
           )}
         </ScrollView>
 
@@ -235,7 +388,7 @@ export function HamburgerMenu({
           >
             <View style={styles.dropdownModal}>
               <Text style={styles.dropdownTitle}>Select Category</Text>
-              <ScrollView style={styles.dropdownList}>
+              <ScrollView style={styles.dropdownList} showsVerticalScrollIndicator={false}>
                 {CATEGORIES.map((cat) => (
                   <Pressable
                     key={cat}
@@ -243,7 +396,15 @@ export function HamburgerMenu({
                       styles.categoryOption,
                       pressed && styles.categoryOptionPressed,
                     ]}
-                    onPress={() => handleSelectCategory(cat)}
+                    onPress={() => {
+                      if (activeActionId) {
+                        setSelectedCategoryMap((prev) => ({
+                          ...prev,
+                          [activeActionId]: cat,
+                        }));
+                      }
+                      setIsDropdownOpen(false);
+                    }}
                   >
                     <Text style={styles.categoryOptionText}>
                       {cat.replace(/_/g, " ")}
@@ -383,6 +544,66 @@ const styles = StyleSheet.create({
   cardActions: {
     marginTop: theme.spacing.xs,
   },
+  actionTitle: {
+    fontSize: theme.fontSize.md,
+    fontWeight: theme.typography.fontWeights.bold,
+    color: theme.colors.ink,
+    flex: 1,
+    marginRight: theme.spacing.xs,
+  },
+  taxTag: {
+    backgroundColor: "#FFF9E6",
+    borderWidth: 1,
+    borderColor: "#FFE0B2",
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.sm,
+    marginTop: theme.spacing.xs,
+  },
+  taxTagText: {
+    fontSize: theme.fontSize.xs,
+    fontWeight: theme.typography.fontWeights.bold,
+    color: "#E65100",
+  },
+  approveBtn: {
+    backgroundColor: theme.colors.brandGreen,
+    borderRadius: theme.radius.sm,
+    paddingVertical: theme.spacing.sm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  approveBtnText: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.typography.fontWeights.black,
+    color: theme.colors.surface,
+  },
+  actionButtonsRow: {
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+  },
+  approveBtnHalf: {
+    flex: 1,
+    backgroundColor: theme.colors.brandGreen,
+    borderRadius: theme.radius.sm,
+    paddingVertical: theme.spacing.sm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rejectBtnHalf: {
+    flex: 1,
+    backgroundColor: "#FFEBE6",
+    borderRadius: theme.radius.sm,
+    paddingVertical: theme.spacing.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#FFC4B5",
+  },
+  rejectBtnText: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.typography.fontWeights.bold,
+    color: "#985743",
+  },
   dropdownTrigger: {
     flexDirection: "row",
     alignItems: "center",
@@ -398,6 +619,24 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.sm,
     fontWeight: theme.typography.fontWeights.semibold,
     color: theme.colors.ink,
+  },
+  submitBtn: {
+    backgroundColor: theme.colors.brandGreen,
+    borderRadius: theme.radius.sm,
+    paddingVertical: theme.spacing.sm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  submitBtnDisabled: {
+    backgroundColor: theme.colors.border,
+  },
+  submitBtnText: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.typography.fontWeights.black,
+    color: theme.colors.surface,
+  },
+  submitBtnTextDisabled: {
+    color: theme.colors.mutedSage.muted2,
   },
   modalOverlay: {
     flex: 1,
