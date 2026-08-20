@@ -6,7 +6,7 @@ import { OnboardingProgress } from "@/components/onboarding/OnboardingProgress";
 import { theme } from "@/constants/theme";
 
 interface OnboardingLayoutProps {
-  step: 1 | 2;
+  step: 0 | 1 | 2;
   eyebrow: string;
   title: string;
   subtitle: string;

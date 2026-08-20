@@ -60,7 +60,7 @@ export interface GigPayoutResponse {
 }
 
 export interface OnboardingState {
-  currentStep: 1 | 2;
+  currentStep: 0 | 1 | 2;
   onboardingCompleted: boolean;
   selectedBank: BankId | null;
   selectedPlatforms: PlatformId[];
