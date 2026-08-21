@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   StyleSheet,
   Text,
@@ -9,11 +10,11 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Bell, ScanLine } from "lucide-react-native";
-
 import { theme } from "@/constants/theme";
 import { supabase } from "@/lib/supabase";
 import { HamburgerMenu } from "@/components/HamburgerMenu";
 import { useOnboarding } from "@/context/OnboardingContext";
+import { Ionicons } from "@expo/vector-icons";
 
 type HeaderProps = {
   eyebrow?: string;
@@ -79,11 +80,18 @@ export function Header({ eyebrow, title, subtitle, onMenuClose }: HeaderProps) {
         ]}
       >
         {/* Page heading */}
-        <View style={styles.headingContainer}>
+        {/* <View style={styles.headingContainer}>
           {eyebrow && <Text style={styles.eyebrow}>{eyebrow}</Text>}
           {title && <Text style={styles.title}>{title}</Text>}
           {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+        </View> */}
+
+            <Animated.View style={styles.splashContent}>
+        <View style={styles.logoCircle}>
+          <Ionicons name="receipt-outline" size={40} color="#0b2e21" />
         </View>
+        <Text style={styles.splashTitle}>GigLedger</Text>
+      </Animated.View>
 
         {/* Actions */}
         <View style={styles.actions}>
@@ -205,5 +213,33 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 10,
     fontWeight: theme.typography.fontWeights.black,
+  },
+    splashRoot: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  splashContent: {
+    alignItems: "center",
+  },
+  logoCircle: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: "#d9ece1",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
+  splashTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#eafff3",
+    letterSpacing: 0.4,
   },
 });
